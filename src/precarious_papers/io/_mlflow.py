@@ -31,12 +31,14 @@ class MLflowPyfuncDataset(AbstractVersionedDataSet):
         self,
         filepath,
         version,
+        log_model=True,
         conda_path=CONTEXT.project_path / "environment.yml",
         pip_path=CONTEXT.project_path / "requirements.txt",
         code_path=CONTEXT.project_path / "src" / "precarious_papers",
     ):
         super().__init__(Path(filepath), version)
         self._conda_path = Path(conda_path)
+        self._log_model = log_model
         self._pip_path = Path(pip_path)
         self._code_path = Path(code_path)
 
@@ -53,6 +55,15 @@ class MLflowPyfuncDataset(AbstractVersionedDataSet):
         )
 
         if isinstance(model, pyfunc.PythonModel):
+            if self._log_model:
+                pyfunc.log_model(
+                    python_model=model,
+                    path=save_path,
+                    conda_env=_conda_env,
+                    code_path=self._code_path,
+                    **kwargs
+                )
+
             pyfunc.save_model(
                 python_model=model,
                 path=save_path,
@@ -63,6 +74,15 @@ class MLflowPyfuncDataset(AbstractVersionedDataSet):
         else:
             warnings.warn("Not PythonModel, attempting to wrap model")
             _wrapped = _PythonModelWrapper(model)
+
+            if self._log_model:
+                pyfunc.log_model(
+                    python_model=_wrapped,
+                    path=save_path,
+                    conda_env=_conda_env,
+                    code_path=self._code_path,
+                    **kwargs
+                )
             pyfunc.save_model(
                 python_model=_wrapped,
                 path=save_path,
@@ -77,9 +97,15 @@ class MLflowPyfuncDataset(AbstractVersionedDataSet):
 
 class MLflowSklearnDataset(AbstractVersionedDataSet):
     def __init__(
-        self, filepath, version, conda_env=None, serialization_format="cloudpickle"
+        self,
+        filepath,
+        version,
+        log_model=True,
+        conda_env=None,
+        serialization_format="cloudpickle",
     ):
         super().__init__(Path(filepath), version)
+        self._log_model = log_model
         self._conda_env = Path(conda_env)
         self._serialization_format = serialization_format
 
@@ -89,6 +115,15 @@ class MLflowSklearnDataset(AbstractVersionedDataSet):
 
     def _save(self, model, path, conda_env=None, **kwargs) -> None:
         save_path = self._get_save_path()
+
+        if self._log_model:
+            sklearn.log_model(
+                sk_model=model,
+                path=save_path,
+                conda_env=self._conda_env,
+                serialization_format=self._serialization_format,
+                **kwargs
+            )
 
         sklearn.save_model(
             sk_model=model,
