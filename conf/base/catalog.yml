@@ -43,11 +43,6 @@
 # This is a data set used by the "Hello World" example pipeline provided with the project
 # template. Please feel free to remove it once you remove the example pipeline.
 
-remote_famafrenchfivefactordaily_data:
-  type: pandas.CSVDataSet
-  filepath: data/01_raw/F-F_Research_Data_5_Factors_2x3_daily.CSV
-  load_args:
-    index_col: 0
-    skiprows: 3
-
-
+example_iris_data:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/iris.csv
