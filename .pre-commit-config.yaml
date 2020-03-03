@@ -31,8 +31,3 @@ repos:
       entry: jupytext --to py:percent
       files: .ipynb
       language: python
-
--   repo: git://github.com/doublify/pre-commit-isort
-    sha: master
-    hooks:
-    -   id: isort
