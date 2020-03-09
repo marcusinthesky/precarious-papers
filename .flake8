@@ -10,3 +10,5 @@ ignore =
         W504,
         # W605 incorrectly flags regex fields
         W605
+
+exclude = notebooks/*

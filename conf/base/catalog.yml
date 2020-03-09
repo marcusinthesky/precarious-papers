@@ -1,7 +1,7 @@
 # Here you can define all your data sets by using simple YAML syntax.
 #
 # Documentation for this file format can be found in "The Data Catalog"
-# Link: https://kedro.readthedocs.io/en/stable/04_user_guide/04_data_catalog.html
+# Link: https://kedro.readthedocs.io/en/stable/04_user_guide/04_catalog.html
 #
 # We support interacting with a variety of data stores including local file systems, cloud, network and HDFS
 #
@@ -37,12 +37,124 @@
 #
 # The Data Catalog supports being able to reference the same file using two different DataSet implementations
 # (transcoding), templating and a way to reuse arguments that are frequently repeated. See more here:
-# https://kedro.readthedocs.io/en/stable/04_user_guide/04_data_catalog.html
+# https://kedro.readthedocs.io/en/stable/04_user_guide/04_catalog.html
 
 #
 # This is a data set used by the "Hello World" example pipeline provided with the project
 # template. Please feel free to remove it once you remove the example pipeline.
 
-example_iris_data:
+# Paradise papers
+## raw
+paradise_edges:
   type: CSVLocalDataSet
-  filepath: data/01_raw/iris.csv
+  filepath: data/01_raw/csv_paradise_papers.2018-02-14/paradise_papers.edges.csv
+
+paradise_nodes_address:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/csv_paradise_papers.2018-02-14/paradise_papers.nodes.address.csv
+
+paradise_nodes_entity:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/csv_paradise_papers.2018-02-14/paradise_papers.nodes.entity.csv
+
+paradise_nodes_intermediary:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/csv_paradise_papers.2018-02-14/paradise_papers.nodes.intermediary.csv
+
+paradise_nodes_officer:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/csv_paradise_papers.2018-02-14/paradise_papers.nodes.officer.csv
+
+paradise_nodes_other:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/csv_paradise_papers.2018-02-14/paradise_papers.nodes.other.csv
+
+# Panama
+## Raw
+panama_edges:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/csv_panama_papers.2018-02-14/panama_papers.edges.csv
+
+panama_nodes_address:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/csv_panama_papers.2018-02-14/panama_papers.nodes.address.csv
+
+panama_nodes_entity:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/csv_panama_papers.2018-02-14/panama_papers.nodes.entity.csv
+
+panama_nodes_intermediary:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/csv_panama_papers.2018-02-14/panama_papers.nodes.intermediary.csv
+
+panama_nodes_officer:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/csv_panama_papers.2018-02-14/panama_papers.nodes.officer.csv
+
+
+# Offshore
+## Raw
+offshore_edges:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/csv_offshore_papers.2018-02-14/offshore_leaks.edges.csv
+
+offshore_nodes_address:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/csv_offshore_papers.2018-02-14/offshore_leaks.nodes.address.csv
+
+offshore_nodes_entity:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/csv_offshore_papers.2018-02-14/offshore_leaks.nodes.entity.csv
+
+offshore_nodes_intermediary:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/csv_offshore_papers.2018-02-14/offshore_leaks.nodes.intermediary.csv
+
+offshore_nodes_officer:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/csv_offshore_papers.2018-02-14/offshore_leaks.nodes.officer.csv
+
+
+# Bahamas
+## Raw
+bahamas_edges:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/csv_bahamas_papers.2017-12-19/bahamas_leaks.edges.csv
+
+bahamas_nodes_address:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/csv_bahamas_papers.2017-12-19/bahamas_leaks.nodes.address.csv
+
+bahamas_nodes_entity:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/csv_bahamas_papers.2017-12-19/bahamas_leaks.nodes.entity.csv
+
+bahamas_nodes_intermediary:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/csv_bahamas_papers.2017-12-19/bahamas_leaks.nodes.intermediary.csv
+
+bahamas_nodes_officer:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/csv_bahamas_papers.2017-12-19/bahamas_leaks.nodes.officer.csv
+
+
+# market_metadata
+
+## CBOE symbol listing
+### link: https://batstrading.co.uk/bxe/market/symbol_listing/csv/
+### accessed: 9 March 2019
+cboe_symbols:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/market_metadata/BXESymbols-PROD.csv
+  args:
+    skiprows: 1
+
+
+## CBOE ticks listing
+### link: https://batstrading.co.uk/bxe/market/symbol_ticks/csv/
+### accessed: 9 March 2019
+cboe_ticks:
+  type: CSVLocalDataSet
+  filepath: data/01_raw/market_metadata/BXETicks-PROD.csv
+  args:
+    skiprows: 1
