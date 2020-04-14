@@ -69,6 +69,12 @@ paradise_nodes_other:
   type: pandas.CSVDataSet
   filepath: data/01_raw/csv_paradise_papers.2018-02-14/paradise_papers.nodes.other.csv
 
+## intermediate
+paradise_price:
+  type: pandas.ParquetDataSet
+  filepath: data/02_intermediate/csv_paradise_papers.2018-02-14/paradise_papers_price.parquet
+
+
 # Panama
 ## Raw
 panama_edges:
@@ -96,11 +102,11 @@ panama_nodes_officer:
 ## Raw
 offshore_edges:
   type: pandas.CSVDataSet
-  filepath: data/01_raw/csv_offshore_papers.2018-02-14/offshore_leaks.edges.csv
+  filepath: data/01_raw/csv_offshore_leaks.2018-02-14/offshore_leaks.edges.csv
 
 offshore_nodes_address:
   type: pandas.CSVDataSet
-  filepath: data/01_raw/csv_offshore_papers.2018-02-14/offshore_leaks.nodes.address.csv
+  filepath: data/01_raw/csv_offshore_leaks.2018-02-14/offshore_leaks.nodes.address.csv
 
 offshore_nodes_entity:
   type: pandas.CSVDataSet
@@ -108,22 +114,22 @@ offshore_nodes_entity:
 
 offshore_nodes_intermediary:
   type: pandas.CSVDataSet
-  filepath: data/01_raw/csv_offshore_papers.2018-02-14/offshore_leaks.nodes.intermediary.csv
+  filepath: data/01_raw/csv_offshore_leaks.2018-02-14/offshore_leaks.nodes.intermediary.csv
 
 offshore_nodes_officer:
   type: pandas.CSVDataSet
-  filepath: data/01_raw/csv_offshore_papers.2018-02-14/offshore_leaks.nodes.officer.csv
+  filepath: data/01_raw/csv_offshore_leaks.2018-02-14/offshore_leaks.nodes.officer.csv
 
 
 # Bahamas
 ## Raw
 bahamas_edges:
   type: pandas.CSVDataSet
-  filepath: data/01_raw/csv_bahamas_papers.2017-12-19/bahamas_leaks.edges.csv
+  filepath: data/01_raw/csv_bahamas_leaks.2017-12-19bahamas_leaks.edges.csv
 
 bahamas_nodes_address:
   type: pandas.CSVDataSet
-  filepath: data/01_raw/csv_bahamas_papers.2017-12-19/bahamas_leaks.nodes.address.csv
+  filepath: data/01_raw/csv_bahamas_leaks.2017-12-19/bahamas_leaks.nodes.address.csv
 
 bahamas_nodes_entity:
   type: pandas.CSVDataSet
@@ -131,11 +137,11 @@ bahamas_nodes_entity:
 
 bahamas_nodes_intermediary:
   type: pandas.CSVDataSet
-  filepath: data/01_raw/csv_bahamas_papers.2017-12-19/bahamas_leaks.nodes.intermediary.csv
+  filepath: data/01_raw/csv_bahamas_leaks.2017-12-19/bahamas_leaks.nodes.intermediary.csv
 
 bahamas_nodes_officer:
   type: pandas.CSVDataSet
-  filepath: data/01_raw/csv_bahamas_papers.2017-12-19/bahamas_leaks.nodes.officer.csv
+  filepath: data/01_raw/csv_bahamas_leaks.2017-12-19/bahamas_leaks.nodes.officer.csv
 
 
 # market_metadata

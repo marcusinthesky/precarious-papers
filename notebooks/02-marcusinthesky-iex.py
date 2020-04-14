@@ -119,6 +119,7 @@ scores_matches = (
     matches.join(fuzzy_name.fuzzy_ratio)
     .assign(cosine_similarity=100 * (1 - d))
     .assign(score=lambda df: (df.cosine_similarity + df.fuzzy_ratio) / 2)
+    .merge(symbols, left_on=["match"], right_on=["name"])
 )
 
 scores_matches.nlargest(1000, "score")
@@ -126,3 +127,6 @@ scores_matches.nlargest(1000, "score")
 
 # %%
 context.catalog.save("iex_matched_entities", scores_matches)
+
+
+# %%
