@@ -73,6 +73,24 @@ paradise_nodes_other:
 paradise_price:
   type: pandas.ParquetDataSet
   filepath: data/02_intermediate/csv_paradise_papers.2018-02-14/paradise_papers_price.parquet
+  versioned: True
+
+paradise_graph:
+  type: networkx.NetworkXDataSet
+  filepath: data/02_intermediate/csv_paradise_papers.2018-02-14/paradise_papers_graph.json
+  versioned: True
+
+paradise_distances:
+  type: pandas.ParquetDataSet
+  filepath: data/02_intermediate/csv_paradise_papers.2018-02-14/paradise_papers_distances.parquet
+  versioned: True
+
+paradise_isomap:
+  type: precarious_papers.io.HoloviewsWriter
+  filepath: data/08_reporting/csv_paradise_papers.2018-02-14/paradise_isomap.html
+  versioned: True
+  save_args:
+    fmt: html
 
 
 # Panama
