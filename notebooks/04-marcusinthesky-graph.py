@@ -36,7 +36,7 @@ nx.classes.function.density(paradise_graph)
 # degree
 (
     hv.Curve(nx.classes.function.degree_histogram(paradise_graph)).opts(
-        title="Degree Histogram", ylabel="Count", xlabel="Degree"
+        title="Degree Histogram", ylabel="Count", xlabel="Degree", logx=True
     )
 )
 
@@ -48,17 +48,7 @@ average_degree = float(sum(dict(paradise_graph.degree()).values())) / float(
 #%%
 context.catalog.save("paradise_graph", paradise_graph)
 # %%
-iex_matched_entities = context.catalog.load("iex_matched_entities")
-filtered_iex_matched_entities = iex_matched_entities.where(
-    lambda df: df.score == 100
-).dropna(how="all")
-
-matched_entities = paradise_entities.merge(
-    filtered_iex_matched_entities.drop(columns=["name"]),
-    left_on="name",
-    right_on="entities",
-    how="inner",
-)
+matched_entities = context.catalog.load("iex_matched_entities")
 
 # %%
 def find_path_length(source, target, G):
@@ -77,39 +67,54 @@ D = pairwise_distances(
     G=paradise_graph,
 )
 
-pairwise_distances = (
-    pd.DataFrame(D, columns=matched_entities.node_id, index=matched_entities.node_id)
+distances = (
+    pd.DataFrame(D, columns=matched_entities.symbol, index=matched_entities.symbol)
     .T.drop_duplicates()
     .T.drop_duplicates()
+    .reset_index()
+    .groupby("symbol")
+    .min()  # .apply(lambda df: df.sample(1)).set_index('symbol')
+    .T.reset_index()
+    .groupby("symbol")
+    .min()  # .apply(lambda df: df.sample(1)).set_index('symbol')
 )
 
-context.catalog.save("paradise_distances", pairwise_distances)
+context.catalog.save("paradise_distances", distances)
 
 
 # %%
 Z = Isomap(2, metric="precomputed").fit_transform(
-    pairwise_distances.fillna(pairwise_distances.max().max())
+    distances.fillna(distances.max().max())
+)
+entity_names = (
+    matched_entities.groupby("symbol")
+    .apply(lambda df: df.sample(1))
+    .set_index("symbol")
+    .loc[distances.index, ["name", "exchange"]]
 )
 components = ["Component 1", "Component 2"]
 isomap_plot = (
-    pd.DataFrame(Z, columns=components)
-    .assign(name=named_entities.name.to_numpy())
+    pd.DataFrame(Z, columns=components, index=entity_names.index)
+    .join(entity_names)
     .hvplot.scatter(
         x=components[0],
         y=components[1],
-        color="name",
+        color="exchange",
         width=800,
         height=600,
-        legend=False,
+        legend=True,
         title="IsoMap",
     )
     .opts(tools=["hover"])
 )
 
 isomap_plot_text = hv.Labels(
-    pd.DataFrame(Z, columns=components).assign(name=named_entities.name.to_numpy()),
+    pd.DataFrame(Z, columns=components, index=entity_names.index).join(entity_names),
     kdims=components,
-    vdims="name",
+    vdims=["name"],
 ).opts(text_font_size="6pt", width=800, height=600, title="IsoMap")
 
 context.catalog.save("paradise_isomap", isomap_plot)
+
+
+# %%

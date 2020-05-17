@@ -18,15 +18,7 @@ hv.extension("bokeh")
 #%%
 # matched entities
 paradise_entities = context.io.load("paradise_nodes_entity")
-iex_matched_entities = context.catalog.load("iex_matched_entities")
-
-stocks = (
-    paradise_entities.merge(
-        iex_matched_entities.drop(columns=["name"]), left_on="name", right_on="entities"
-    )
-    .where(lambda df: df.score == 100)
-    .dropna(how="all")
-)
+stocks = context.catalog.load("iex_matched_entities")
 
 #%%
 release = pd.to_datetime(context.params["release"]["paradise_papers"])

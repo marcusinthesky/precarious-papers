@@ -31,7 +31,13 @@ entities = (
         [
             context.io.load(c)
             for c in context.catalog.list()
-            if c.endswith("_nodes_entity")
+            if c
+            in [
+                "paradise_nodes_entity",
+                "paradise_nodes_intermediary",
+                "paradise_nodes_officer",
+                "paradise_nodes_other",
+            ]
         ],
         axis=0,
     )
@@ -44,33 +50,35 @@ entities_in = entities.name.str.lower().isin(symbols.name.str.lower())
 entities.name.loc[entities_in]
 
 # %%
-stop_words = [
-    "limited",
-    "ltd",
-    "llc",
-    "corp",
-    "inc",
-    "corperation",
-    "incorperated",
-    "limited",
-    "holdings",
-    "foundation",
-    "sa",
-    "systems",
-    "consulting",
-    "enterprises",
-    "group",
-    "financial",
-    "services",
-    "communications",
-    "management",
-    "enterprise",
-    "foundation",
-    "global",
-    "international",
-]
+stop_words = []
+#     "limited",
+#     "ltd",
+#     "llc",
+#     "corp",
+#     "inc",
+#     "corperation",
+#     "incorperated",
+#     "limited",
+#     "holdings",
+#     "foundation",
+#     "sa",
+#     "systems",
+#     "consulting",
+#     "enterprises",
+#     "group",
+#     "financial",
+#     "services",
+#     "communications",
+#     "management",
+#     "enterprise",
+#     "foundation",
+#     "global",
+#     "international",
+# ]
 
-analyzer = TfidfVectorizer(analyzer="word", smooth_idf=False, stop_words=stop_words)
+analyzer = TfidfVectorizer(
+    analyzer="word", smooth_idf=False
+)  # , stop_words=stop_words)
 
 symbols_vec = analyzer.fit_transform(symbols.name)
 
@@ -126,7 +134,29 @@ scores_matches.nlargest(1000, "score")
 
 
 # %%
-context.catalog.save("iex_matched_entities", scores_matches)
+import string
+
+perfect = (
+    entities.assign(
+        lower_string=lambda df: df.name.str.lower().str.replace(
+            "[{}]".format(string.punctuation), ""
+        )
+    )
+    .assign(entities=lambda df: df.name)
+    .merge(
+        symbols.assign(
+            lower_string=lambda df: df.name.str.lower().str.replace(
+                "[{}]".format(string.punctuation), ""
+            )
+        ).rename(columns={"name": "match"}),
+        on="lower_string",
+        how="inner",
+    )
+    .assign(score=100)
+)
+
+# %%
+context.catalog.save("iex_matched_entities", perfect)  # scores_matches)
 
 
 # %%

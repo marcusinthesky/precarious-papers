@@ -69,6 +69,15 @@ paradise_nodes_other:
   type: pandas.CSVDataSet
   filepath: data/01_raw/csv_paradise_papers.2018-02-14/paradise_papers.nodes.other.csv
 
+indices:
+  type: pandas.CSVDataSet
+  filepath: data/01_raw/exchange_prices.csv
+  load_args:
+    parse_dates:
+      - Date
+    index_col:
+      - Date
+
 ## intermediate
 paradise_price:
   type: pandas.ParquetDataSet
@@ -143,7 +152,7 @@ offshore_nodes_officer:
 ## Raw
 bahamas_edges:
   type: pandas.CSVDataSet
-  filepath: data/01_raw/csv_bahamas_leaks.2017-12-19bahamas_leaks.edges.csv
+  filepath: data/01_raw/csv_bahamas_leaks.2017-12-19/bahamas_leaks.edges.csv
 
 bahamas_nodes_address:
   type: pandas.CSVDataSet
