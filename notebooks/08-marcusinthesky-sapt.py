@@ -19,8 +19,9 @@ matched = context.catalog.load("iex_matched_entities")  # scores_matches)
 distances = context.io.load("paradise_distances")
 price = context.io.load("paradise_price")
 indices = context.io.load("indices")
-balancesheet = context.catalog.load("financials")
+balancesheet = context.catalog.load("balance_sheet")
 release = pd.to_datetime(context.params["release"]["paradise_papers"])
+income = context.catalog.load("income_statement")
 
 
 # %%
@@ -95,9 +96,12 @@ factors = pd.merge_asof(
     .rename(columns={"index": "symbol"})
     .assign(reportDate=release)
     .sort_values("reportDate"),
-    balancesheet.assign(
-        reportDate=lambda df: pd.to_datetime(df.reportDate)
-    ).sort_values("reportDate"),
+    balancesheet.merge(
+        income.drop(columns=["minorityInterest", "fiscalDate", "currency"]),
+        on=["reportDate", "symbol"],
+    )
+    .assign(reportDate=lambda df: pd.to_datetime(df.reportDate))
+    .sort_values("reportDate"),
     on="reportDate",
     by="symbol",
     direction="backward",
@@ -120,8 +124,10 @@ features = (
     .assign(
         hml=lambda df: df.price / (df.totalAssets / df.commonStock),
         smb=lambda df: df.price * df.commonStock,
+        rmw=lambda df: df.grossProfit / df.totalRevenue,
+        cma=lambda df: df.researchAndDevelopment,
     )
-    .loc[:, ["rm", "hml", "smb", "alpha", "returns"]]
+    .loc[:, ["rm", "hml", "smb", "rmw", "cma", "alpha", "returns"]]
 )
 
 model = OLS(features.returns, features.drop(columns=["returns"]))
@@ -129,7 +135,7 @@ results = model.fit()
 results.summary()
 
 # %%
-distribution = poisson(3)
+distribution = poisson(4.661997)  # 3)
 D = (
     renamed_distances.loc[features.index, features.index]
     .replace(0, np.nan)
@@ -151,7 +157,64 @@ ar_results.summary()
 # exogenous
 slx_model = OLS(
     features.returns,
-    features.loc[:, ["rm", "alpha", "smb"]].join(ar_features.loc[:, ["smb_ar"]]),
+    features.loc[:, ["rm", "alpha",]].join(ar_features.drop(columns=["alpha_ar"])),
 )
 slx_results = slx_model.fit()
 slx_results.summary()
+
+
+def p_elimination(x, y, sl):
+    x = pd.DataFrame(x)
+    noCols = x.shape[1]
+    for i in range(0, noCols):
+        ols_regeressor = OLS(exog=x.assign(alpha=1), endog=y).fit()
+        pValues = ols_regeressor.pvalues
+        if max(pValues) > sl:
+            x = x.drop(np.argmax(pValues), axis=1)
+        else:
+            break
+    return x
+
+
+def backward_elimination(x, y, sl):
+    x = pd.DataFrame(np.append(np.ones((x.shape[0], 1)).astype(int), x, axis=1))
+    rSqData = pd.DataFrame(r_sq_elimination(x, y))
+    finalModel = p_elimination(rSqData, y, sl)
+    return finalModel
+
+
+def r_sq_elimination(x, y):
+    x = pd.DataFrame(x)
+    ols_regeressor = OLS(exog=x.assign(alpha=1), endog=y).fit()
+    bestValue = float("{0:.4f}".format(ols_regeressor.rsquared_adj))
+    noOfColumn = x.shape[1]
+    bestModel = pd.DataFrame(x)
+    foundNew = False
+    for i in range(1, noOfColumn):
+        temp = x.drop(x.columns[i], axis=1)
+        ols_regeressor = OLS(endog=y, exog=temp).fit()
+        rValue = float("{0:.4f}".format(ols_regeressor.rsquared_adj))
+        if bestValue < rValue:
+            bestValue = rValue
+            bestModel = temp
+            foundNew = True
+
+    if foundNew == True:
+        bestModel = r_sq_elimination(bestModel, y)
+        return bestModel
+    return bestModel
+
+
+selected_features = r_sq_elimination(
+    x=features.drop(columns=["returns", "alpha"]).join(
+        ar_features.drop(columns=["returns_ar", "alpha_ar"])
+    ),
+    y=features.returns,
+)
+
+# selected
+selected_model = OLS(
+    features.returns, features.loc[:, ["alpha",]].join(selected_features),
+)
+selected_results = selected_model.fit()
+selected_results.summary()

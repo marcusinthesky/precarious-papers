@@ -78,9 +78,17 @@ indices:
     index_col:
       - Date
 
-financials:
+balance_sheet:
   type: pandas.ParquetDataSet
-  filepath: data/01_raw/financials.parquet
+  filepath: data/01_raw/balance_sheet.parquet
+
+income_statement:
+  type: pandas.ParquetDataSet
+  filepath: data/01_raw/income_statement.parquet
+
+market_cap:
+  type: pandas.ParquetDataSet
+  filepath: data/01_raw/market_cap.parquet
 
 ## intermediate
 paradise_price:

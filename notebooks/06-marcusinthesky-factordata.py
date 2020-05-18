@@ -33,7 +33,7 @@ end = (
 
 
 # %%
-def get_financials(ticker):
+def get_balance_sheet(ticker):
     data_set = APIDataSet(
         url=f"https://cloud.iexapis.com/stable/stock/{ticker}/balance-sheet",
         params={"period": "annual", "last": 4, "token": IEX_APIKEY},
@@ -43,10 +43,10 @@ def get_financials(ticker):
 
 
 # %%
-financials = (
+balance_sheet_data = (
     matched.loc[:, ["symbol"]]
     .drop_duplicates()
-    .assign(financials=lambda df: df.symbol.apply(get_financials))
+    .assign(balance_sheet=lambda df: df.symbol.apply(get_balance_sheet))
 )
 
 # %%
@@ -57,5 +57,58 @@ def balancesheet_to_frame(d):
         return pd.DataFrame()
 
 
-balancesheet = pd.concat(financials.financials.apply(balancesheet_to_frame).tolist())
-context.catalog.save("financials", balancesheet)
+balancesheet = pd.concat(
+    balance_sheet_data.balance_sheet.apply(balancesheet_to_frame).tolist()
+)
+context.catalog.save("balance_sheet", balancesheet)
+
+# %%
+def get_income_statement(ticker):
+    try:
+        data_set = APIDataSet(
+            url=f"https://cloud.iexapis.com/stable/stock/{ticker}/income",
+            params={"period": "annual", "last": 4, "token": IEX_APIKEY},
+            json=True,
+        )
+        return data_set.load()
+    except:
+        return {}
+
+
+income_statement_data = (
+    matched.loc[:, ["symbol"]]
+    .drop_duplicates()
+    .assign(income_statement=lambda df: df.symbol.apply(get_income_statement))
+)
+
+#%%
+def income_statement_to_frame(d):
+    if "income" in d.keys() and "symbol" in d.keys():
+        return pd.DataFrame(d["income"]).assign(symbol=d["symbol"])
+    else:
+        return pd.DataFrame()
+
+
+income_statement = pd.concat(
+    income_statement_data.income_statement.apply(income_statement_to_frame).tolist()
+)
+context.catalog.save("income_statement", income_statement)
+
+
+# %%
+def get_market_cap(ticker):
+    data_set = APIDataSet(
+        url=f"https://cloud.iexapis.com/stable/stock/{ticker}/stats/marketcap",
+        params={"period": "annual", "last": 4, "token": IEX_APIKEY},
+        json=True,
+    )
+    return data_set.load()
+
+
+market_cap_data = (
+    matched.loc[:, ["symbol"]]
+    .drop_duplicates()
+    .assign(market_cap=lambda df: df.symbol.apply(get_market_cap))
+)
+
+context.catalog.save("market_cap", market_cap_data)
