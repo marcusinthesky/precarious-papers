@@ -19,10 +19,7 @@ hv.extension("bokeh")
 
 #%%
 # matched entities
-paradise_entities = context.io.load("paradise_nodes_entity")
-iex_matched_entities = context.catalog.load("iex_matched_entities")
-distances = context.io.load("paradise_distances")
-price = context.io.load("paradise_price")
+matched = context.catalog.load("iex_matched_entities")
 
 
 #%%
@@ -34,27 +31,31 @@ end = (
     release + pd.tseries.offsets.BDay(context.params["window"]["end"])
 ).to_pydatetime()
 
-#%%
 
-companies = (
-    paradise_entities.merge(
-        iex_matched_entities.drop(columns=["name"]), left_on="name", right_on="entities"
+# %%
+def get_financials(ticker):
+    data_set = APIDataSet(
+        url=f"https://cloud.iexapis.com/stable/stock/{ticker}/balance-sheet",
+        params={"period": "annual", "last": 4, "token": IEX_APIKEY},
+        json=True,
     )
-    .set_index("node_id")
+    return data_set.load()
+
+
+# %%
+financials = (
+    matched.loc[:, ["symbol"]]
     .drop_duplicates()
-    .where(lambda x: x.score == 100)
-    .dropna(how="all")
+    .assign(financials=lambda df: df.symbol.apply(get_financials))
 )
 
 # %%
-symbol = "AAPL"
-data_set = APIDataSet(
-    url=f"https://cloud.iexapis.com/stable/stock/{symbol}/balance-sheet",
-    params={"period": "annual", "last": 4, "token": IEX_APIKEY},
-    json=True,
-)
+def balancesheet_to_frame(d):
+    if "balancesheet" in d.keys() and "symbol" in d.keys():
+        return pd.DataFrame(d["balancesheet"]).assign(symbol=d["symbol"])
+    else:
+        return pd.DataFrame()
 
-# %%
-data = data_set.load()
 
-# %%
+balancesheet = pd.concat(financials.financials.apply(balancesheet_to_frame).tolist())
+context.catalog.save("financials", balancesheet)

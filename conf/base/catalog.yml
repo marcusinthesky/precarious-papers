@@ -78,6 +78,10 @@ indices:
     index_col:
       - Date
 
+financials:
+  type: pandas.ParquetDataSet
+  filepath: data/01_raw/financials.parquet
+
 ## intermediate
 paradise_price:
   type: pandas.ParquetDataSet
