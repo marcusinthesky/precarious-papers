@@ -8,6 +8,7 @@ import pysal as ps
 import seaborn as sns
 from pysal import explore
 from scipy.stats import norm, poisson
+from scipy import stats
 from statsmodels.regression.linear_model import OLS
 
 hv.extension("bokeh")
@@ -135,11 +136,32 @@ results = model.fit()
 results.summary()
 
 # %%
-distribution = poisson(4.661997)  # 3)
+# %%
+samples = renamed_distances.replace(0, np.nan).melt().value.dropna()
+distributions = pd.Series(
+    ["gamma", "invgamma", "invgauss", "norm", "pareto"], name="Distributions"
+)
+
+
+def likelihood(d):
+    parameters = getattr(stats, d).fit(samples)
+    dist = getattr(stats, d)(*parameters)
+    return samples.apply(dist.logpdf).multiply(-1).sum()
+
+
+ll = distributions.to_frame().assign(
+    likelihood=lambda df: df.Distributions.apply(likelihood)
+)
+
+p = stats.poisson(samples.mean())
+samples.apply(p.logpmf).multiply(-1).sum()
+
+# %%
+distribution = stats.pareto(*stats.pareto.fit(samples))  # 3)
 D = (
     renamed_distances.loc[features.index, features.index]
     .replace(0, np.nan)
-    .apply(distribution.pmf)
+    .apply(distribution.pdf)
     .fillna(0)
 )
 ar_features = (D.dot(features) / D.dot(features.apply(pd.np.ones_like))).rename(
@@ -154,6 +176,7 @@ ar_model = OLS(
 ar_results = ar_model.fit()
 ar_results.summary()
 
+# %%
 # exogenous
 slx_model = OLS(
     features.returns,
@@ -161,6 +184,8 @@ slx_model = OLS(
 )
 slx_results = slx_model.fit()
 slx_results.summary()
+
+# %%
 
 
 def p_elimination(x, y, sl):
@@ -202,12 +227,12 @@ def r_sq_elimination(x, y):
     if foundNew == True:
         bestModel = r_sq_elimination(bestModel, y)
         return bestModel
-    return bestModel
+    return bestModel, ols_regeressor.aic
 
 
-selected_features = r_sq_elimination(
+selected_features, aic = r_sq_elimination(
     x=features.drop(columns=["returns", "alpha"]).join(
-        ar_features.drop(columns=["returns_ar", "alpha_ar"])
+        ar_features.drop(columns=["alpha_ar"])
     ),
     y=features.returns,
 )
@@ -215,6 +240,43 @@ selected_features = r_sq_elimination(
 # selected
 selected_model = OLS(
     features.returns, features.loc[:, ["alpha",]].join(selected_features),
+)
+selected_results = selected_model.fit()
+selected_results.summary()
+
+
+# %%
+# [markdown] Investigate factors which describe the most likely entity-relationship depth
+from scipy.optimize import minimize
+
+
+def dist_param(lam):
+    distribution = stats.poisson(lam)
+    D = (
+        renamed_distances.loc[features.index, features.index]
+        .replace(0, np.nan)
+        .apply(distribution.pmf)
+        .fillna(0)
+    )
+    spatial_corr_features = (
+        D.dot(features.drop(columns=[]))
+        / D.dot(features.drop(columns=[]).apply(pd.np.ones_like))
+    ).rename(columns=lambda x: x + "_ar")
+    exog = features.drop(columns=["returns", "alpha"]).join(
+        spatial_corr_features.drop(columns=["alpha_ar"])
+    )
+    feat, aic = r_sq_elimination(x=exog.fillna(exog.mean()), y=features.returns)
+    return feat, aic
+
+
+best_lam = minimize(lambda l: dist_param(l)[1], x0=3, method="Nelder-Mead", tol=1e-6)
+
+selected_features, best_aic = dist_param(best_lam.x)
+
+# selected
+selected_model = OLS(
+    features.returns,
+    features.loc[:, ["alpha",]].join(selected_features).drop(columns=[]),
 )
 selected_results = selected_model.fit()
 selected_results.summary()
