@@ -10,6 +10,8 @@ from pysal import explore
 from scipy.stats import norm, poisson
 from scipy import stats
 from statsmodels.regression.linear_model import OLS
+import statsmodels.api as sm
+
 
 hv.extension("bokeh")
 
@@ -33,6 +35,8 @@ index = (
     .exchange
 )
 
+rf = ((1 + 3.18e-05) ** 5) - 1
+
 rm_rates = (
     index.rename("index")
     .to_frame()
@@ -46,8 +50,9 @@ rm_rates = (
         left_on="index",
         right_index=True,
     )
-    .rm
+    .rm.subtract(rf)
 )
+
 
 # %%
 returns = (
@@ -57,6 +62,7 @@ returns = (
     .cumprod()
     .tail(1)
     .subtract(1)
+    .subtract(rf)
 )
 
 returns.columns = returns.columns.droplevel(1)
@@ -254,29 +260,209 @@ def dist_param(lam):
     distribution = stats.poisson(lam)
     D = (
         renamed_distances.loc[features.index, features.index]
+        .drop(["MSFT", "SAVE"])
+        .drop(columns=["MSFT", "SAVE"])
         .replace(0, np.nan)
         .apply(distribution.pmf)
         .fillna(0)
     )
     spatial_corr_features = (
-        D.dot(features.drop(columns=[]))
-        / D.dot(features.drop(columns=[]).apply(pd.np.ones_like))
+        D.dot(features.drop(columns=[]).drop(["MSFT", "SAVE"]))
+        / D.dot(features.drop(columns=[]).drop(["MSFT", "SAVE"]).apply(pd.np.ones_like))
     ).rename(columns=lambda x: x + "_ar")
-    exog = features.drop(columns=["returns", "alpha"]).join(
-        spatial_corr_features.drop(columns=["alpha_ar"])
+    exog = (
+        features.drop(["MSFT", "SAVE"])
+        .drop(columns=["returns", "alpha"])
+        .join(spatial_corr_features.drop(columns=["alpha_ar"]))
     )
-    feat, aic = r_sq_elimination(x=exog.fillna(exog.mean()), y=features.returns)
+    feat, aic = r_sq_elimination(
+        x=exog.fillna(exog.mean()), y=features.returns.drop(["MSFT", "SAVE"])
+    )
     return feat, aic
 
 
-best_lam = minimize(lambda l: dist_param(l)[1], x0=3, method="Nelder-Mead", tol=1e-6)
+best_lam = minimize(lambda l: dist_param(l)[1], x0=5, method="Nelder-Mead", tol=1e-6)
 
 selected_features, best_aic = dist_param(best_lam.x)
 
+
+selected_exogenous = (
+    features.loc[:, ["alpha",]]
+    .join(selected_features)
+    .rename(columns={"rm": "(rm - rf)", "rm_ar": "(rm - rf)_ar"})
+    .rename(
+        columns=lambda s: f"W({s.split('_')[0]})"
+        if len(s.split("_")) == 2
+        else s.split("_")[0]
+    )
+    # .drop(columns=['rm_ar', 'hml_ar', 'rmw_ar'])
+)
 # selected
 selected_model = OLS(
-    features.returns,
-    features.loc[:, ["alpha",]].join(selected_features).drop(columns=[]),
+    features.returns.rename("ri - rf").drop(["MSFT", "SAVE"]),
+    selected_exogenous.drop(["MSFT", "SAVE"]),  # .drop(columns=['smb'])
 )
 selected_results = selected_model.fit()
 selected_results.summary()
+
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(12, 8))
+fig = sm.graphics.influence_plot(selected_results, ax=ax, criterion="cooks")
+
+
+fig, ax = plt.subplots(figsize=(8, 6))
+fig = sm.graphics.plot_leverage_resid2(selected_results, ax=ax)
+
+fig = plt.figure(figsize=(12, 8))
+fig = sm.graphics.plot_partregress_grid(selected_results, fig=fig)
+
+fig = plt.figure(figsize=(12, 8))
+fig = sm.graphics.plot_ccpr_grid(selected_results, fig=fig)
+
+
+res = selected_results.resid  # residuals
+fig = sm.qqplot(res, fit=True, line="45", color="black")
+plt.title("Q-Q Plots of Residuals")
+plt.show()
+
+res.hvplot.hist(xlabel="Residuals", title="Distribution of Residuals")
+
+# %%
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+
+# %%
+exog = (selected_features).drop(columns=[])
+pd.Series(
+    [variance_inflation_factor(exog.values, i) for i in range(exog.shape[1])],
+    index=exog.columns,
+)
+
+
+# %%
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+
+pca = Pipeline([("scale", StandardScaler()), ("pca", PCA())])
+pca.fit(selected_exogenous.drop(columns="alpha").dropna())
+pd.Series(pca.named_steps["pca"].explained_variance_ratio_).hvplot.bar(
+    title="Variance Explained Ratio"
+)
+
+
+select_pca = Pipeline([("scale", StandardScaler()), ("pca", PCA(5))])
+selected_exogenous_components = select_pca.fit_transform(
+    selected_exogenous.drop(columns="alpha").dropna()
+)
+
+# selected
+pcr_exogenous = pd.DataFrame(
+    selected_exogenous_components,
+    index=selected_exogenous.drop(columns="alpha").dropna().index,
+).assign(alpha=1)
+
+pcr_model = OLS(
+    features.returns.rename("ri - rf").loc[pcr_exogenous.index], pcr_exogenous
+)
+pcr_results = pcr_model.fit()
+pcr_results.summary()
+
+# %%
+# Note: drop high influence causes nan's, which must be dropped
+from sklearn.utils import resample
+from sklearn.linear_model import LinearRegression
+
+n_samples = 1000
+bootstap_coefficients = pd.DataFrame(
+    np.zeros((n_samples, selected_exogenous.shape[1])),
+    columns=selected_exogenous.columns,
+)
+
+
+def bootstrap_samples(zeros):
+    y_sample, X_sample = resample(
+        features.returns.rename("ri - rf"), selected_exogenous.drop(columns=["alpha"])
+    )
+
+    select_pcr = Pipeline(
+        [("scale", StandardScaler()), ("pca", PCA(X_sample.shape[1]))]
+    )
+
+    model_pcr = LinearRegression(fit_intercept=True)
+
+    model_pcr.fit(select_pcr.fit_transform(X_sample), y_sample)
+
+    return pd.Series(
+        np.hstack(
+            (
+                model_pcr.intercept_,
+                select_pcr.named_steps["pca"]
+                .inverse_transform(model_pcr.coef_.reshape(1, -1))
+                .flatten(),
+            )
+        ),
+        index=selected_exogenous.columns,
+    )
+
+
+bootstap_coefficients_df = bootstap_coefficients.apply(
+    bootstrap_samples, axis="columns"
+)
+bootstap_coefficients_df.hvplot.box()
+
+bootstap_coefficients_df.describe()
+bootstap_coefficients_df.quantile([0.01, 0.5, 0.99])
+
+(
+    bootstap_coefficients_df.agg(["mean", "std"])
+    .T.rename(columns={"std": "se", "mean": "coefficient"})
+    .assign(
+        t=lambda df: df.coefficient / df.se,
+        pvalue=lambda df: (
+            bootstap_coefficients_df.apply(lambda x: x * np.sign(x.mean())) < 0
+        )
+        .sum()
+        .add(1)
+        .divide(n_samples + 1),
+    )
+)
+# Davison and Hinkley (1997), Bootstrap Methods and their Application, p. 141.
+
+from sklearn.metrics import r2_score
+
+r2_score(
+    features.returns,
+    pd.concat(
+        [
+            selected_exogenous.loc[:, ["alpha"]],
+            pd.DataFrame(
+                select_pcr.named_steps["scale"].transform(
+                    selected_exogenous.iloc[:, 1:]
+                ),
+                columns=selected_exogenous.iloc[:, 1:].columns,
+                index=selected_exogenous.index,
+            ),
+        ],
+        axis=1,
+    )
+    @ bootstap_coefficients_df.mean(),
+)
+
+
+pcr_ols = OLS(
+    features.returns.rename("ri - rf"),
+    pd.DataFrame(
+        select_pcr.fit_transform(selected_exogenous.drop(columns=["alpha"])),
+        index=features.index,
+    )
+    .assign(alpha=1)
+    .drop(columns=[3, 0, 5, 1]),
+).fit()
+f = pcr_ols.params.drop(index="alpha")
+c = np.zeros((1, X_sample.shape[1]))
+c[:, f.index.tolist()] = f.to_numpy().flatten()
+pd.Series(
+    select_pcr.named_steps["pca"].inverse_transform(c).flatten(),
+    index=selected_exogenous.drop(columns=["alpha"]).columns,
+)
