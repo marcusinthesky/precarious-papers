@@ -129,12 +129,24 @@ features = (
     .select_dtypes(include="number")
     .join(average_price)
     .assign(
-        hml=lambda df: df.price / (df.totalAssets / df.commonStock),
-        smb=lambda df: df.price * df.commonStock,
-        rmw=lambda df: df.grossProfit / df.totalRevenue,
-        cma=lambda df: df.researchAndDevelopment,
+        price_to_earnings=lambda df: df.price / (df.totalAssets / df.commonStock),
+        market_capitalization=lambda df: df.price * df.commonStock,
+        profit_margin=lambda df: df.grossProfit / df.totalRevenue,
+        price_to_research=lambda df: (df.price * df.commonStock)
+        / df.researchAndDevelopment,
     )
-    .loc[:, ["rm", "hml", "smb", "rmw", "cma", "alpha", "returns"]]
+    .loc[
+        :,
+        [
+            "rm",
+            "price_to_earnings",
+            "market_capitalization",
+            "profit_margin",
+            "price_to_research",
+            "alpha",
+            "returns",
+        ],
+    ]
 )
 
 model = OLS(features.returns, features.drop(columns=["returns"]))
@@ -170,6 +182,13 @@ D = (
     .apply(distribution.pdf)
     .fillna(0)
 )
+
+# # Test for rank Bramoulle et al 2009
+# from numpy.linalg import matrix_rank
+# assert matrix_rank(D) == D.shape[0]
+# assert matrix_rank(D@D) == D.shape[0]
+
+
 ar_features = (D.dot(features) / D.dot(features.apply(pd.np.ones_like))).rename(
     columns=lambda x: x + "_ar"
 )
@@ -295,15 +314,21 @@ selected_exogenous = (
         if len(s.split("_")) == 2
         else s.split("_")[0]
     )
-    # .drop(columns=['rm_ar', 'hml_ar', 'rmw_ar'])
+    # .drop(columns=['rm_ar', 'price_to_earnings_ar', 'profit_margin_ar'])
 )
 # selected
-selected_model = OLS(
-    features.returns.rename("ri - rf").drop(["MSFT", "SAVE"]),
-    selected_exogenous.drop(["MSFT", "SAVE"]),  # .drop(columns=['smb'])
-)
+
+X = selected_exogenous.drop(["MSFT", "SAVE"])
+y = features.returns.rename("ri - rf").drop(["MSFT", "SAVE"])
+Xt = X.loc[:, ["W(price_to_earnings)", "W(profit_margin)", "W(price_to_research)"]]
+yt = X.loc[:, ["W(returns)"]]
+Mt = OLS(yt, Xt.assign(alpha=1)).fit()
+Et = Mt.resid
+
+selected_model = OLS(y, X)
 selected_results = selected_model.fit()
 selected_results.summary()
+
 
 import matplotlib.pyplot as plt
 
@@ -336,133 +361,4 @@ exog = (selected_features).drop(columns=[])
 pd.Series(
     [variance_inflation_factor(exog.values, i) for i in range(exog.shape[1])],
     index=exog.columns,
-)
-
-
-# %%
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
-
-pca = Pipeline([("scale", StandardScaler()), ("pca", PCA())])
-pca.fit(selected_exogenous.drop(columns="alpha").dropna())
-pd.Series(pca.named_steps["pca"].explained_variance_ratio_).hvplot.bar(
-    title="Variance Explained Ratio"
-)
-
-
-select_pca = Pipeline([("scale", StandardScaler()), ("pca", PCA(5))])
-selected_exogenous_components = select_pca.fit_transform(
-    selected_exogenous.drop(columns="alpha").dropna()
-)
-
-# selected
-pcr_exogenous = pd.DataFrame(
-    selected_exogenous_components,
-    index=selected_exogenous.drop(columns="alpha").dropna().index,
-).assign(alpha=1)
-
-pcr_model = OLS(
-    features.returns.rename("ri - rf").loc[pcr_exogenous.index], pcr_exogenous
-)
-pcr_results = pcr_model.fit()
-pcr_results.summary()
-
-# %%
-# Note: drop high influence causes nan's, which must be dropped
-from sklearn.utils import resample
-from sklearn.linear_model import LinearRegression
-
-n_samples = 1000
-bootstap_coefficients = pd.DataFrame(
-    np.zeros((n_samples, selected_exogenous.shape[1])),
-    columns=selected_exogenous.columns,
-)
-
-
-def bootstrap_samples(zeros):
-    y_sample, X_sample = resample(
-        features.returns.rename("ri - rf"), selected_exogenous.drop(columns=["alpha"])
-    )
-
-    select_pcr = Pipeline(
-        [("scale", StandardScaler()), ("pca", PCA(X_sample.shape[1]))]
-    )
-
-    model_pcr = LinearRegression(fit_intercept=True)
-
-    model_pcr.fit(select_pcr.fit_transform(X_sample), y_sample)
-
-    return pd.Series(
-        np.hstack(
-            (
-                model_pcr.intercept_,
-                select_pcr.named_steps["pca"]
-                .inverse_transform(model_pcr.coef_.reshape(1, -1))
-                .flatten(),
-            )
-        ),
-        index=selected_exogenous.columns,
-    )
-
-
-bootstap_coefficients_df = bootstap_coefficients.apply(
-    bootstrap_samples, axis="columns"
-)
-bootstap_coefficients_df.hvplot.box()
-
-bootstap_coefficients_df.describe()
-bootstap_coefficients_df.quantile([0.01, 0.5, 0.99])
-
-(
-    bootstap_coefficients_df.agg(["mean", "std"])
-    .T.rename(columns={"std": "se", "mean": "coefficient"})
-    .assign(
-        t=lambda df: df.coefficient / df.se,
-        pvalue=lambda df: (
-            bootstap_coefficients_df.apply(lambda x: x * np.sign(x.mean())) < 0
-        )
-        .sum()
-        .add(1)
-        .divide(n_samples + 1),
-    )
-)
-# Davison and Hinkley (1997), Bootstrap Methods and their Application, p. 141.
-
-from sklearn.metrics import r2_score
-
-r2_score(
-    features.returns,
-    pd.concat(
-        [
-            selected_exogenous.loc[:, ["alpha"]],
-            pd.DataFrame(
-                select_pcr.named_steps["scale"].transform(
-                    selected_exogenous.iloc[:, 1:]
-                ),
-                columns=selected_exogenous.iloc[:, 1:].columns,
-                index=selected_exogenous.index,
-            ),
-        ],
-        axis=1,
-    )
-    @ bootstap_coefficients_df.mean(),
-)
-
-
-pcr_ols = OLS(
-    features.returns.rename("ri - rf"),
-    pd.DataFrame(
-        select_pcr.fit_transform(selected_exogenous.drop(columns=["alpha"])),
-        index=features.index,
-    )
-    .assign(alpha=1)
-    .drop(columns=[3, 0, 5, 1]),
-).fit()
-f = pcr_ols.params.drop(index="alpha")
-c = np.zeros((1, X_sample.shape[1]))
-c[:, f.index.tolist()] = f.to_numpy().flatten()
-pd.Series(
-    select_pcr.named_steps["pca"].inverse_transform(c).flatten(),
-    index=selected_exogenous.drop(columns=["alpha"]).columns,
 )
