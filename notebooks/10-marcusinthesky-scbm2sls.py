@@ -279,6 +279,7 @@ test = sms.linear_harvey_collier(results)
 list(zip(name, test))
 
 
+# %%
 # SLX
 Xt = X.drop(columns=["market_capitalization", "price_to_research", "price_to_earnings"])
 model = OLS(
@@ -286,21 +287,35 @@ model = OLS(
 ).fit()
 model.summary()
 
+# %%
 # SAR
 Xt = X.drop(columns=["market_capitalization", "price_to_research", "price_to_earnings"])
 model = OLS(y, Xt.assign(alpha=1, endogenous=G @ y)).fit()
 model.summary()
 
+# %%
 # G2SLS
+# y = y - y.mean()
 S = pd.concat([(I - G) @ X, (I - G) @ G @ X, (I - G) @ G @ G @ X], axis=1)
 P = S @ pd.DataFrame(np.linalg.pinv(S.T @ S), index=S.columns, columns=S.columns) @ S.T
-Xt = pd.concat([(I - G) @ G @ y, (I - G) @ X, (I - G) @ G @ X], axis=1)
+P = P.apply(lambda x: x / np.sum(x), 1)
+
+Xt = pd.concat(
+    [
+        ((I - G) @ G @ y).rename(columns={"returns": "endogenous"}),
+        (I - G) @ X,
+        ((I - G) @ G @ X).rename(columns=lambda x: x + "_exogenous"),
+    ],
+    axis=1,
+)
+
+# %%
 Th2sls = (
     pd.DataFrame(np.linalg.pinv(Xt.T @ P @ Xt), columns=Xt.columns, index=Xt.columns)
     @ Xt.T
     @ P
     @ y
-).rename(columns={"returns": "Theta_2sls"})
+).rename(columns={"returns": "Endogenous"})
 Zh = pd.concat(
     [
         (I - G) @ G @ (Xt @ Th2sls),
@@ -314,10 +329,8 @@ Thlle = (
     @ Zh.T
     @ y
 ).rename(columns={"returns": "Theta_lle"})
-d = y.subtract((Zh @ Thlle).to_numpy()).pow(2).sum()
-D = pd.DataFrame(np.identity(Zh.shape[0]), columns=Zh.index, index=Zh.index).multiply(
-    d.item()
-)
+d = y.subtract((Zh @ Thlle).to_numpy()).pow(2)
+D = pd.DataFrame(np.diag(d.to_numpy().flatten()), columns=Zh.index, index=Zh.index)
 Vhlle = (
     pd.DataFrame(np.linalg.pinv(Zh.T @ Xt), index=Zh.columns, columns=Zh.columns)
     @ Zh.T
@@ -325,6 +338,42 @@ Vhlle = (
     @ Zh
     @ pd.DataFrame(np.linalg.pinv(Zh.T @ Xt), index=Zh.columns, columns=Zh.columns)
 )
-SE_Vhlle = pd.DataFrame(np.diag(Vhlle), index=Vhlle.columns, columns=["SE"])
+SE_Vhlle = pd.DataFrame(np.diag(Vhlle), index=Vhlle.columns, columns=["SE"]).pow(0.5)
 T_lle = (Thlle / SE_Vhlle.to_numpy()).rename(columns={"Theta_lle": "T_lle"})
-p = T_lle.apply(stats.t(df=139).sf).rename(columns={"T_lle": "p_lle"})
+p_lle = (
+    T_lle.apply(np.abs)
+    .apply(stats.t(df=Zh.shape[0] - Zh.shape[1]).sf)
+    .rename(columns={"T_lle": "p_lle"})
+)
+p_lle
+
+# %%
+X = A
+X = X.drop(columns=["market_capitalization", "price_to_earnings"])
+Xt = pd.concat(
+    [
+        ((I - G) @ G @ y).rename(columns={"returns": "endogenous"}),
+        (I - G) @ X,
+        ((I - G) @ G @ X).rename(columns=lambda x: x + "_exogenous"),
+    ],
+    axis=1,
+)
+
+theta_sls = IV2SLS(y, Xt, S).fit()
+zh = pd.concat(
+    [
+        (I - G)
+        @ G
+        @ pd.DataFrame(theta_sls.predict(), index=Xt.index, columns=["endogenous"]),
+        (I - G) @ X,
+        (((I - G) @ G @ X).rename(columns=lambda x: x + "_exogenous")),
+    ],
+    axis=1,
+)
+# .drop(columns=['price_to_earnings', 'market_capitalization', 'market_capitalization_exogenous',  'price_to_earnings_exogenous'])
+theta_lle = IV2SLS(y, Xt.assign(alpha=1), zh.assign(alpha=1)).fit()
+results = theta_lle
+theta_lle.summary()
+
+
+# %%
