@@ -183,7 +183,7 @@ def hyperparam(lam=5):
 
     # bramoulle
     # step 1
-    X = features.drop(columns=["alpha", "returns"]).loc[:, ["rm"]]
+    X = features.drop(columns=["alpha", "returns"])
     y = features.loc[:, ["returns"]]
     GX = (G @ X).rename(columns=lambda s: s + "_exogenous")
     Gy = (G @ y).rename(columns=lambda s: "endogenous")
@@ -206,14 +206,14 @@ def hyperparam(lam=5):
     model = IV2SLS(y, Xt.assign(alpha=1), Zh.assign(alpha=1))
     results = model.fit()
 
-    return -results.fvalue, results
+    return results.resid.apply(stats.norm.logpdf).apply(np.negative).sum(), results, Xt
 
 
 best_param = minimize(
     lambda x: hyperparam(x)[0], x0=samples.mean(), method="Nelder-Mead", tol=1e-6,
 )
 
-r_squared_adj, results = hyperparam(best_param.x)
+r_squared_adj, results, Xt = hyperparam(best_param.x)
 
 # summary
 results.summary()
@@ -251,6 +251,8 @@ stats.ttest_1samp(results.resid, 0, axis=0)
             .hvplot.scatter(x=k, y="Residuals")
             for k, v in Xt.rename(
                 columns=lambda s: " ".join(s.split("_")).title()
+                if s.split("_")[-1] != "exogenous"
+                else " ".join(s.split("_")).title() + " Social Effect"
             ).items()
         ],
     )
@@ -672,7 +674,7 @@ print(model.summary)
 
 # %%
 model = ps.model.spreg.GM_Combo(
-    y.to_numpy(), X.to_numpy(), w=w, name_x=X.columns.tolist()
+    y.to_numpy(), X.to_numpy(), w_lags=1, w=w, name_x=X.columns.tolist()
 )
 print(model.summary)
 
