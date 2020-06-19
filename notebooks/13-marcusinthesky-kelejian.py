@@ -166,10 +166,8 @@ X, y = features.drop(columns=["returns", "alpha"]), features.loc[:, ["returns"]]
 def opt_lam(lam):
     try:
         print(lam)
-        distribution = stats.poisson(lam)
+        distribution = stats.poisson(*lam.tolist())
 
-        # k, mu = x
-        # distribution = stats.poisson(k, mu)
         D = (
             renamed_distances.loc[features.index, features.index]
             .replace(0, np.nan)
@@ -191,11 +189,14 @@ def opt_lam(lam):
         )
 
         return -model.pr2_e, model, G
+        # return - pd.DataFrame(model.e_filtered).apply(stats.norm.logpdf).apply(np.negative).sum().item(), model, G
+
     except:
+        print("error")
         return 0, None, None
 
 
-best_param = minimize(lambda x: opt_lam(x)[0], x0=2, method="Nelder-Mead", tol=1e-6,)
+best_param = minimize(lambda x: opt_lam(x)[0], x0=np.array([1.42984118]), tol=1e-6,)
 
 best_param
 
@@ -203,12 +204,26 @@ best_param
 pr2_e, model, G = opt_lam(best_param.x)
 
 I = np.identity(G.shape[1])
+print(pr2_e)
+print(model.summary)
 
+# %%
+# max spatial r2
+pr2_e, model, G = opt_lam(np.array([1.4299176]))
+print(model.summary)
+
+# %%
+pr2_e, model, G = opt_lam(np.array([1]))
+print(model.summary)
+
+# %%
+# min ll
+pr2_e, model, G = opt_lam(np.array([4.18129292]))
 print(model.summary)
 
 
 # %%
-features = [
+features_names = [
     "α",
     "rₘ - rf",
     "Price-to-earnings",
@@ -219,7 +234,9 @@ features = [
     "λ",
 ]
 S = np.linalg.inv(I - model.betas[-2][0] * G)
-effects = pd.DataFrame(model.betas[1:-2], index=features[1:-2], columns=["Coefficient"])
+effects = pd.DataFrame(
+    model.betas[1:-2], index=features_names[1:-2], columns=["Coefficient"]
+)
 (
     effects.assign(
         Direct=lambda df: df.Coefficient.apply(lambda s: np.diag(S * s).mean())
@@ -240,10 +257,11 @@ bind = btot - b
 
 full_eff = pd.DataFrame(
     np.hstack([b, bind, btot]),
-    index=features[1:-2],
+    index=features_names[1:-2],
     columns=["Direct", "Indirect", "Total"],
 )
 full_eff
+
 
 # %%
 pd.DataFrame(
@@ -253,7 +271,7 @@ pd.DataFrame(
         "t": [z for z, p in model.z_stat],
         "p-value": [p.round(3) for z, p in model.z_stat],
     },
-    index=features,
+    index=features_names,
 )
 
 
@@ -293,3 +311,17 @@ stats.ttest_1samp(model.e_filtered, 0, axis=0)
     )
     * hv.HLine(0).opts(color="black")
 ).cols(1)
+
+# %%
+# Heteroskedasticity tests¶
+## Breush-Pagan test:
+import statsmodels.stats.api as sms
+
+name = ["Lagrange multiplier statistic", "p-value", "f-value", "f p-value"]
+test = sms.het_breuschpagan(model.e_filtered, X)
+list(zip(name, test))
+
+## Goldfeld-Quandt test:
+name = ["F statistic", "p-value"]
+test = sms.het_goldfeldquandt(model.e_filtered, X)
+list(zip(name, test))
