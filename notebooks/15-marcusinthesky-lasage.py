@@ -161,14 +161,21 @@ results.summary()
 samples = renamed_distances.replace(0, np.nan).melt().value.dropna()
 
 X, y = features.drop(columns=["returns", "alpha"]), features.loc[:, ["returns"]]
+exclude = ["HL", "GLMD", "SHIP", "ESEA", "TWIN", "CVGI", "MXL", "GLBS", "MRVL", "LVS"]
 
-distribution = stats.poisson(4.661996779388084)
+X = X.drop(exclude)
+y = y.drop(exclude)
+distribution = stats.poisson(samples.mean())
 
 D = (
-    renamed_distances.loc[features.index, features.index]
-    .replace(0, np.nan)
-    .apply(distribution.pmf)
-    .fillna(0)
+    (
+        renamed_distances.loc[features.index, features.index]
+        .replace(0, np.nan)
+        .apply(distribution.pmf)
+        .fillna(0)
+    )
+    .drop(exclude)
+    .drop(columns=exclude)
 )
 
 # G = D
@@ -209,10 +216,14 @@ def opt_lam(lam):
         distribution = stats.poisson(*lam.tolist())
 
         D = (
-            renamed_distances.loc[features.index, features.index]
-            .replace(0, np.nan)
-            .apply(distribution.pmf)
-            .fillna(0)
+            (
+                renamed_distances.loc[features.index, features.index]
+                .replace(0, np.nan)
+                .apply(distribution.pmf)
+                .fillna(0)
+            )
+            .drop(exclude)
+            .drop(columns=exclude)
         )
 
         # G = D
@@ -238,9 +249,9 @@ def opt_lam(lam):
 
 best_param = minimize(lambda x: opt_lam(x)[0], x0=np.array([samples.mean()]), tol=1e-6,)
 
-pr2_e, slx_unresticted_varying, G_opt = opt_lam(best_param.x)
+pr2_e, sdm_unresticted_varying, G_opt = opt_lam(best_param.x)
 print(best_param.x)
-print(slx_unresticted_varying.summary)
+print(sdm_unresticted_varying.summary)
 
 # \lambda: 4.76413852
 
@@ -262,12 +273,14 @@ print(slx_unresticted_varying.summary)
 #            W_dep_var      -0.9615484       0.4048675      -2.3749706       0.0175503
 
 
+# can reject \rho = 0 with p-value = 0.0175503
+
 # %%
 # test of the likelihood ratio on the common factor hypothesis (θ = −ρβ )
-n = slx_unresticted_varying.n  # (scalar) number of observations
+n = sdm_unresticted_varying.n  # (scalar) number of observations
 
 # constained
-constrained = slx_unresticted_varying.betas.copy()
+constrained = sdm_unresticted_varying.betas.copy()
 constrained[6:-1, :] = -constrained[-1, :] * constrained[1:6, :]
 utu = (
     pd.concat([y.pow(0), XGX, G @ y], axis=1)
@@ -281,10 +294,77 @@ constrained_ll_result = -0.5 * (
 )
 
 # lambda_lr
-lam_lr = -2 * (constrained_ll_result - slx_unresticted_varying.logll)
-stats.chi.sf(lam_lr, 5)
+lam_lr = np.exp(constrained_ll_result) / np.exp(sdm_unresticted_varying.logll)
+#  4.583616e-23
+
+chi = -2 * (constrained_ll_result - sdm_unresticted_varying.logll)
+stats.chi.sf(chi, 5)
 
 # can reject (θ = −ρβ )
+
+# %%
+# est of the likelihood ratio on θ = 0
+n = sdm_unresticted_varying.n  # (scalar) number of observations
+
+# constained
+constrained_theta = sdm_unresticted_varying.betas.copy()
+constrained_theta[6:-1, :] = 0
+utu_theta = (
+    pd.concat([y.pow(0), XGX, G @ y], axis=1)
+    .dot(constrained_theta)
+    .subtract(y.to_numpy())
+    .pow(2)
+    .sum()
+)
+constrained_theta_ll_result = -0.5 * (
+    n * (np.log(2 * np.pi)) + n * np.log(utu_theta / n) + (utu_theta / (utu_theta / n))
+)
+
+# lambda_lr
+lam_lr_theta = np.exp(constrained_theta_ll_result) / np.exp(
+    sdm_unresticted_varying.logll
+)
+lam_lr_theta
+#  4.575699e-16
+
+chi_theta = -2 * (constrained_theta_ll_result - sdm_unresticted_varying.logll)
+stats.chi.sf(chi_theta, 5)
+
+# reject H0: \all θ = 0
+
+# %%
+# est of the likelihood ratio on θ = 0
+n = sdm_unresticted_varying.n  # (scalar) number of observations
+
+# constained
+constrained_rho = sdm_unresticted_varying.betas.copy()
+constrained_rho[-1, :] = 0
+utu_rho = (
+    pd.concat([y.pow(0), XGX, G @ y], axis=1)
+    .dot(constrained_rho)
+    .subtract(y.to_numpy())
+    .pow(2)
+    .sum()
+)
+constrained_rho_ll_result = -0.5 * (
+    n * (np.log(2 * np.pi)) + n * np.log(utu_rho / n) + (utu_rho / (utu_rho / n))
+)
+
+# lambda_lr
+lam_lr_rho = np.exp(constrained_rho_ll_result) / np.exp(sdm_unresticted_varying.logll)
+lam_lr_rho
+#  0.0064
+
+chi_rho = -2 * (constrained_rho_ll_result - sdm_unresticted_varying.logll)
+stats.chi.sf(chi_rho, 1)
+
+# reject H0: \all θ = 0
+
+# %%
+# \lambda = 0
+OLS(sdm_unresticted_varying.e_pred, G @ sdm_unresticted_varying.e_pred).fit().summary()
+# p-value = 0.005
+
 
 # %%
 # GM_SDM : unrestricted, fixed \lambda
@@ -396,10 +476,14 @@ def opt_lam(lam):
         distribution = stats.poisson(*lam.tolist())
 
         D = (
-            renamed_distances.loc[features.index, features.index]
-            .replace(0, np.nan)
-            .apply(distribution.pmf)
-            .fillna(0)
+            (
+                renamed_distances.loc[features.index, features.index]
+                .replace(0, np.nan)
+                .apply(distribution.pmf)
+                .fillna(0)
+            )
+            .drop(exclude)
+            .drop(columns=exclude)
         )
 
         # G = D
@@ -425,9 +509,9 @@ def opt_lam(lam):
 
 best_param = minimize(lambda x: opt_lam(x)[0], x0=np.array([samples.mean()]), tol=1e-6,)
 
-pr2_e, slx_unresticted_varying, G_opt = opt_lam(best_param.x)
+pr2_e, sdm_unresticted_varying, G_opt = opt_lam(best_param.x)
 print(best_param.x)
-print(slx_unresticted_varying.summary)
+print(sdm_unresticted_varying.summary)
 
 
 # %%

@@ -156,13 +156,16 @@ model = OLS(features.returns, features.drop(columns=["returns"]))
 results = model.fit()
 results.summary()
 
+# Reject normality assumption Leptokurtic present
+fig, ax = plt.subplots(figsize=(12, 8))
+fig = sm.graphics.influence_plot(results, ax=ax, criterion="cooks")
 
 # %%
+# Winsorize
+X, y = features.drop(columns=["returns", "alpha"]), features.loc[:, ["returns"]]
 samples = renamed_distances.replace(0, np.nan).melt().value.dropna()
 
-X, y = features.drop(columns=["returns", "alpha"]), features.loc[:, ["returns"]]
-
-distribution = stats.poisson(4.661996779388084)
+distribution = stats.poisson(samples.mean())
 
 D = (
     renamed_distances.loc[features.index, features.index]
@@ -171,6 +174,36 @@ D = (
     .fillna(0)
 )
 
+try:
+    exclude = [
+        "HL",
+        "GLMD",
+        "SHIP",
+        "ESEA",
+        "TWIN",
+        "CVGI",
+        "MXL",
+        "GLBS",
+        "MRVL",
+        "LVS",
+    ]
+    X = X.drop(exclude)
+    y = y.drop(exclude)
+    # G = G.drop(exclude).drop(columns=exclude)
+    D = D.drop(exclude).drop(columns=exclude)
+except:
+    print("skipped")
+    pass
+
+# %%
+model = OLS(y, X)
+results = model.fit()
+results.summary()
+
+# Prob(JB):	0.0825
+
+
+# %%
 # G = D
 G = D.apply(lambda x: x / np.sum(x), 1)
 w = ps.lib.weights.full2W(G.to_numpy(), ids=G.index.tolist())
@@ -192,12 +225,18 @@ print(ols_unresticted.summary)
 # Lagrange Multiplier (SARMA)       2           0.409           0.8150
 
 # __Reject & Conclude:__ \rho = 0 ; \lambda = 0
+# __Reject & Conclude:__ No heteroskedasticity, errors normal
 
 # %%
 # SLX : unrestricted, fixed \lambda
 XGX = pd.concat([X, (G @ X).rename(columns=lambda s: s + "_exog")], axis=1)
 slx_unresticted = ps.model.spreg.OLS(
-    y.to_numpy(), XGX.to_numpy(), name_x=XGX.columns.tolist(), w=w, spat_diag=True
+    y.to_numpy(),
+    XGX.to_numpy(),
+    name_x=XGX.columns.tolist(),
+    w=w,
+    spat_diag=True,
+    moran=True,
 )
 print(slx_unresticted.summary)
 
@@ -234,10 +273,14 @@ def opt_lam(lam):
         distribution = stats.poisson(*lam.tolist())
 
         D = (
-            renamed_distances.loc[features.index, features.index]
-            .replace(0, np.nan)
-            .apply(distribution.pmf)
-            .fillna(0)
+            (
+                renamed_distances.loc[features.index, features.index]
+                .replace(0, np.nan)
+                .apply(distribution.pmf)
+                .fillna(0)
+            )
+            .drop(exclude)
+            .drop(columns=exclude)
         )
 
         # G = D
@@ -252,6 +295,7 @@ def opt_lam(lam):
             name_x=XGX.columns.tolist(),
             w=w,
             spat_diag=True,
+            moran=True,
         )
 
         return -model.ar2, model, G
@@ -261,13 +305,11 @@ def opt_lam(lam):
         return 0, None, None
 
 
-best_param = minimize(
-    lambda x: opt_lam(x)[0], x0=np.array([4.661996779388084]), tol=1e-6,
-)
+best_param = minimize(lambda x: opt_lam(x)[0], x0=np.array([samples.mean()]), tol=1e-6,)
 
-pr2_e, slx_unresticted, G_opt = opt_lam(best_param.x)
+pr2_e, slx_unresticted_varying, G_opt = opt_lam(best_param.x)
 print(best_param.x)
-print(slx_unresticted.summary)
+print(slx_unresticted_varying.summary)
 
 # Adjusted R-squared  :      0.0923
 
@@ -281,14 +323,72 @@ print(slx_unresticted.summary)
 
 #             Variable     Coefficient       Std.Error     t-Statistic     Probability
 # ------------------------------------------------------------------------------------
-#             CONSTANT      -0.0964947       0.0362427      -2.6624601       0.0086999
-#                   rm      -0.5810657       0.6590867      -0.8816225       0.3795480
-#    price_to_earnings       0.0013110       0.0021698       0.6041827       0.5467362
-# market_capitalization       0.0000000       0.0000000       0.8948871       0.3724402
-#        profit_margin      -0.0296935       0.0128575      -2.3094326       0.0224374 *
-#    price_to_research       0.0000025       0.0000042       0.6000757       0.5494617
-#              rm_exog      -2.8261209       4.6899954      -0.6025850       0.5477957
-# price_to_earnings_exog       0.0280325       0.0222323       1.2608878       0.2095240
-# market_capitalization_exog       0.0000000       0.0000000       1.3398966       0.1825300
-#   profit_margin_exog       0.2027940       0.1159498       1.7489813       0.0825670
-# price_to_research_exog      -0.0002248       0.0001188      -1.8918424       0.0606538 .
+#             CONSTANT      -0.0703139       0.0485818      -1.4473313       0.1503074
+#                   rm      -1.0425771       0.4763806      -2.1885379       0.0304890
+#    price_to_earnings       0.0005655       0.0016768       0.3372456       0.7364973
+# market_capitalization       0.0000000       0.0000000       1.7851038       0.0766697
+#        profit_margin      -0.0142906       0.0099831      -1.4314832       0.1547873
+#    price_to_research       0.0000051       0.0000441       0.1152248       0.9084518
+#              rm_exog      -7.6982077       6.1931103      -1.2430277       0.2161842
+# price_to_earnings_exog      -0.0539144       0.0389459      -1.3843392       0.1687210
+# market_capitalization_exog       0.0000000       0.0000000       1.7109739       0.0895664
+#   profit_margin_exog       0.4088909       0.2500903       1.6349731       0.1045705
+# price_to_research_exog      -0.0002667       0.0004534      -0.5881385       0.5575005
+
+
+# TEST ON NORMALITY OF ERRORS
+# TEST                             DF        VALUE           PROB
+# Jarque-Bera                       2           5.868           0.0532
+# Accept H0 that errors are normal
+
+# DIAGNOSTICS FOR HETEROSKEDASTICITY
+# RANDOM COEFFICIENTS
+# TEST                             DF        VALUE           PROB
+# Breusch-Pagan test               10           5.263           0.8729
+# Koenker-Bassett test             10           3.651           0.9617
+
+
+# %%
+XGX_opt = pd.concat([X, (G_opt @ X).rename(columns=lambda s: s + "_exogenous")], axis=1)
+w_opt = ps.lib.weights.full2W(G_opt.to_numpy(), ids=G_opt.index.tolist())
+
+sdm = ps.model.spreg.ML_Lag(
+    y.to_numpy(),
+    XGX_opt.to_numpy(),
+    w=w_opt,
+    name_x=XGX_opt.columns.tolist(),
+    spat_diag=True,
+)
+
+print(sdm.summary)
+
+
+# %%
+sdem = ps.model.spreg.ML_Error(
+    y.to_numpy(),
+    XGX_opt.to_numpy(),
+    w=w_opt,
+    name_x=XGX_opt.columns.tolist(),
+    spat_diag=True,
+)
+
+print(sdem.summary)
+
+# %%
+
+# kernel_lambda = 1.62635982
+
+#             Variable     Coefficient       Std.Error     z-Statistic     Probability
+# ------------------------------------------------------------------------------------
+#             CONSTANT      -0.0630518       0.0461842      -1.3652236       0.1721828
+#                   rm      -1.1135144       0.4528767      -2.4587585       0.0139418
+#    price_to_earnings       0.0006254       0.0015912       0.3930243       0.6943016
+# market_capitalization       0.0000000       0.0000000       1.9311239       0.0534677
+#        profit_margin      -0.0142618       0.0094695      -1.5060829       0.1320459
+#    price_to_research       0.0000043       0.0000418       0.1021696       0.9186221
+#         rm_exogenous     -12.1283875       5.9343032      -2.0437762       0.0409757
+# price_to_earnings_exogenous      -0.0484173       0.0370256      -1.3076723       0.1909845
+# market_capitalization_exogenous       0.0000000       0.0000000       1.9034183       0.0569860
+# profit_margin_exogenous       0.3832053       0.2374677       1.6137155       0.1065891
+# price_to_research_exogenous      -0.0003341       0.0004337      -0.7705228       0.4409899
+#            W_dep_var      -0.7128200       0.3931902      -1.8129141       0.0698451

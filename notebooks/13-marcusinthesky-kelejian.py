@@ -159,8 +159,43 @@ results.summary()
 
 # %%
 samples = renamed_distances.replace(0, np.nan).melt().value.dropna()
+exclude = ["HL", "GLMD", "SHIP", "ESEA", "TWIN", "CVGI", "MXL", "GLBS", "MRVL", "LVS"]
 
 X, y = features.drop(columns=["returns", "alpha"]), features.loc[:, ["returns"]]
+X = X.drop(exclude)
+y = y.drop(exclude)
+
+# %%
+distribution = stats.poisson(samples.mean())
+
+D = (
+    (
+        renamed_distances.loc[features.index, features.index]
+        .replace(0, np.nan)
+        .apply(distribution.pmf)
+        .fillna(0)
+    )
+    .drop(exclude)
+    .drop(columns=exclude)
+)
+
+# G = D
+G = D.apply(lambda x: x / np.sum(x), 1)
+
+w = ps.lib.weights.full2W(G.to_numpy(), ids=G.index.tolist())
+kp_model_fixed = ps.model.spreg.GM_Combo_Het(
+    step1c=True,
+    y=(y).to_numpy(),
+    x=X.to_numpy(),
+    w_lags=2,
+    w=w,
+    name_x=X.columns.tolist(),
+)
+
+print(kp_model_fixed.summary)
+
+
+# %%
 
 
 def opt_lam(lam):
@@ -169,10 +204,14 @@ def opt_lam(lam):
         distribution = stats.poisson(*lam.tolist())
 
         D = (
-            renamed_distances.loc[features.index, features.index]
-            .replace(0, np.nan)
-            .apply(distribution.pmf)
-            .fillna(0)
+            (
+                renamed_distances.loc[features.index, features.index]
+                .replace(0, np.nan)
+                .apply(distribution.pmf)
+                .fillna(0)
+            )
+            .drop(exclude)
+            .drop(columns=exclude)
         )
 
         # G = D
@@ -196,30 +235,18 @@ def opt_lam(lam):
         return 0, None, None
 
 
-best_param = minimize(lambda x: opt_lam(x)[0], x0=np.array([1.42984118]), tol=1e-6,)
+best_param = minimize(
+    lambda x: opt_lam(x)[0], x0=np.array([samples.mean() / 2]), tol=1e-6,
+)
 
 best_param
 
 # %%
-pr2_e, model, G = opt_lam(best_param.x)
+pr2_e, kp_model_varying, G_hat = opt_lam(best_param.x)
 
-I = np.identity(G.shape[1])
+I = np.identity(G_hat.shape[1])
 print(pr2_e)
-print(model.summary)
-
-# %%
-# max spatial r2
-pr2_e, model, G = opt_lam(np.array([1.4299176]))
-print(model.summary)
-
-# %%
-pr2_e, model, G = opt_lam(np.array([1]))
-print(model.summary)
-
-# %%
-# min ll
-pr2_e, model, G = opt_lam(np.array([4.18129292]))
-print(model.summary)
+print(kp_model_varying.summary)
 
 
 # %%
@@ -233,16 +260,18 @@ features_names = [
     "Wy",
     "λ",
 ]
-S = np.linalg.inv(I - model.betas[-2][0] * G)
+S = np.linalg.inv(I - kp_model_varying.betas[-2][0] * G)
 effects = pd.DataFrame(
-    model.betas[1:-2], index=features_names[1:-2], columns=["Coefficient"]
+    kp_model_varying.betas[1:-2], index=features_names[1:-2], columns=["Coefficient"]
 )
 (
     effects.assign(
         Direct=lambda df: df.Coefficient.apply(lambda s: np.diag(S * s).mean())
     )
     .assign(
-        Total=lambda df: df.Coefficient.apply(lambda s: (S * s).sum().sum() / model.n)
+        Total=lambda df: df.Coefficient.apply(
+            lambda s: (S * s).sum().sum() / kp_model_varying.n
+        )
     )
     .assign(Indirect=lambda df: df.Total - df.Direct)
     .loc[:, ["Coefficient", "Direct", "Indirect", "Total"]]
@@ -250,8 +279,8 @@ effects = pd.DataFrame(
 
 
 # %%
-b = model.betas[1:-2]
-rho = model.rho
+b = kp_model_varying.betas[1:-2]
+rho = kp_model_varying.rho
 btot = b / (float(1) - rho)
 bind = btot - b
 
@@ -266,10 +295,10 @@ full_eff
 # %%
 pd.DataFrame(
     {
-        "Estimate": model.betas.flatten(),
-        "SE": model.std_err.flatten(),
-        "t": [z for z, p in model.z_stat],
-        "p-value": [p.round(3) for z, p in model.z_stat],
+        "Estimate": kp_model_varying.betas.flatten(),
+        "SE": kp_model_varying.std_err.flatten(),
+        "t": [z for z, p in kp_model_varying.z_stat],
+        "p-value": [p.round(3) for z, p in kp_model_varying.z_stat],
     },
     index=features_names,
 )
@@ -277,7 +306,9 @@ pd.DataFrame(
 
 # %%
 # probablity plot
-osm_osr, slope_intercept_r = stats.probplot(model.e_filtered.flatten(), dist="norm")
+osm_osr, slope_intercept_r = stats.probplot(
+    kp_model_varying.e_filtered.flatten(), dist="norm"
+)
 
 (
     pd.DataFrame(dict(zip(("Quantile", "Ordered Values"), osm_osr))).hvplot.scatter(
@@ -295,7 +326,7 @@ osm_osr, slope_intercept_r = stats.probplot(model.e_filtered.flatten(), dist="no
 ).opts(title="Probability Plot")
 
 # %%
-stats.ttest_1samp(model.e_filtered, 0, axis=0)
+stats.ttest_1samp(kp_model_varying.e_filtered, 0, axis=0)
 
 # %%
 # heteroskedasticity plots
@@ -304,7 +335,7 @@ stats.ttest_1samp(model.e_filtered, 0, axis=0)
         add,
         [
             v.to_frame()
-            .assign(Residuals=model.e_filtered)
+            .assign(Residuals=kp_model_varying.e_filtered)
             .hvplot.scatter(x=k, y="Residuals")
             for k, v in X.items()
         ],
