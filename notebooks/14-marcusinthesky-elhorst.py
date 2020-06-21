@@ -15,6 +15,7 @@ from scipy import stats
 from scipy.optimize import minimize
 from scipy.stats import norm, poisson
 from statsmodels.regression.linear_model import OLS
+import statsmodels.stats.api as sms
 
 # from bromoulle
 from statsmodels.sandbox.regression.gmm import IV2SLS
@@ -161,47 +162,66 @@ fig, ax = plt.subplots(figsize=(12, 8))
 fig = sm.graphics.influence_plot(results, ax=ax, criterion="cooks")
 
 # %%
-# Winsorize
-X, y = features.drop(columns=["returns", "alpha"]), features.loc[:, ["returns"]]
-samples = renamed_distances.replace(0, np.nan).melt().value.dropna()
 
-distribution = stats.poisson(samples.mean())
+exclude = []
+for i in range(29):
+    # Winsorize
+    X, y = features.drop(columns=["returns", "alpha"]), features.loc[:, ["returns"]]
+    samples = renamed_distances.replace(0, np.nan).melt().value.dropna()
+    average_degree = 2.9832619059417067
 
-D = (
-    renamed_distances.loc[features.index, features.index]
-    .replace(0, np.nan)
-    .apply(distribution.pmf)
-    .fillna(0)
-)
+    distribution = stats.poisson(average_degree)  # samples.mean())
 
-try:
-    exclude = [
-        "HL",
-        "GLMD",
-        "SHIP",
-        "ESEA",
-        "TWIN",
-        "CVGI",
-        "MXL",
-        "GLBS",
-        "MRVL",
-        "LVS",
-    ]
-    X = X.drop(exclude)
-    y = y.drop(exclude)
-    # G = G.drop(exclude).drop(columns=exclude)
-    D = D.drop(exclude).drop(columns=exclude)
-except:
-    print("skipped")
-    pass
+    D = (
+        renamed_distances.loc[features.index, features.index]
+        .replace(0, np.nan)
+        .apply(distribution.pmf)
+        .fillna(0)
+    )
+
+    try:
+        X = X.drop(exclude)
+        y = y.drop(exclude)
+        # G = G.drop(exclude).drop(columns=exclude)
+        D = D.drop(exclude).drop(columns=exclude)
+    except:
+        print("skipped")
+        pass
+
+    model = OLS(y, X.assign(alpha=1))
+    results = model.fit()
+    results.summary()
+
+    tests = sms.jarque_bera(results.resid)
+    print(tests)
+    if tests[1] > 0.2:
+        break
+
+    # Prob(JB):	0.0825
+
+    # %%
+    excluder = (
+        pd.Series(results.get_influence().influence, index=y.index).nlargest(1).index[0]
+    )
+    print(excluder)
+    exclude.append(excluder)
+
+    # cook = pd.Series(results.get_influence().cooks_distance[0], index=y.index).nlargest(1).index[0]
+    # print(cook)
+    # if exclude != cook:
+    #     exclude.append(cook)
+
 
 # %%
-model = OLS(y, X)
-results = model.fit()
 results.summary()
 
-# Prob(JB):	0.0825
+# %%
+# Reject normality assumption Leptokurtic present
+fig, ax = plt.subplots(figsize=(12, 8))
+fig = sm.graphics.influence_plot(results, ax=ax, criterion="DFFITS")
 
+# %%
+pd.Series(results.get_influence().influence, index=y.index).nlargest(5)
 
 # %%
 # G = D
@@ -218,14 +238,13 @@ print(ols_unresticted.summary)
 
 # DIAGNOSTICS FOR SPATIAL DEPENDENCE
 # TEST                           MI/DF       VALUE           PROB
-# Lagrange Multiplier (lag)         1           0.219           0.6398
-# Robust LM (lag)                   1           0.261           0.6092
-# Lagrange Multiplier (error)       1           0.148           0.7006  # https://www.tandfonline.com/doi/abs/10.1080/03610918.2013.781626
-# Robust LM (error)                 1           0.190           0.6627
-# Lagrange Multiplier (SARMA)       2           0.409           0.8150
+# Lagrange Multiplier (lag)         1           0.431           0.5117
+# Robust LM (lag)                   1           3.499           0.0614
+# Lagrange Multiplier (error)       1           1.080           0.2988
+# Robust LM (error)                 1           4.147           0.0417
+# Lagrange Multiplier (SARMA)       2           4.578           0.1014
 
-# __Reject & Conclude:__ \rho = 0 ; \lambda = 0
-# __Reject & Conclude:__ No heteroskedasticity, errors normal
+#
 
 # %%
 # SLX : unrestricted, fixed \lambda
@@ -362,6 +381,8 @@ sdm = ps.model.spreg.ML_Lag(
 
 print(sdm.summary)
 
+OLS(sdm.e_pred, G_opt @ sdm.e_pred).fit().summary()
+
 
 # %%
 sdem = ps.model.spreg.ML_Error(
@@ -373,6 +394,9 @@ sdem = ps.model.spreg.ML_Error(
 )
 
 print(sdem.summary)
+
+OLS(sdem.e_filtered, G_opt @ y).fit().summary()
+
 
 # %%
 

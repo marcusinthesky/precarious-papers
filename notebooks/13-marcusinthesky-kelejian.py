@@ -159,14 +159,45 @@ results.summary()
 
 # %%
 samples = renamed_distances.replace(0, np.nan).melt().value.dropna()
-exclude = ["HL", "GLMD", "SHIP", "ESEA", "TWIN", "CVGI", "MXL", "GLBS", "MRVL", "LVS"]
+exclude = [
+    "DNN",
+    "GLBS",
+    "EXEL",
+    "SHIP",
+    "GLNG",
+    "TAT",
+    "CCF",
+    "HNW",
+    "ESEA",
+    "HES",
+    "CVGI",
+    "MXL",
+    "MASI",
+    "CL",
+    "TWIN",
+    "SBLK",
+    "MRVL",
+    "TXN",
+    "FGEN",
+    "PFPT",
+    "ROST",
+    "LVS",
+    "QCOM",
+    "MSFT",
+    "INTC",
+    "JNJ",
+    "COST",
+    "AMGN",
+    "ARCC",
+]
 
 X, y = features.drop(columns=["returns", "alpha"]), features.loc[:, ["returns"]]
 X = X.drop(exclude)
 y = y.drop(exclude)
 
+
 # %%
-distribution = stats.poisson(samples.mean())
+distribution = stats.poisson(average_degree)
 
 D = (
     (
@@ -196,8 +227,6 @@ print(kp_model_fixed.summary)
 
 
 # %%
-
-
 def opt_lam(lam):
     try:
         print(lam)
@@ -235,9 +264,7 @@ def opt_lam(lam):
         return 0, None, None
 
 
-best_param = minimize(
-    lambda x: opt_lam(x)[0], x0=np.array([samples.mean() / 2]), tol=1e-6,
-)
+best_param = minimize(lambda x: opt_lam(x)[0], x0=np.array([average_degree]), tol=1e-6,)
 
 best_param
 

@@ -43,6 +43,8 @@ nx.classes.function.density(paradise_graph)
 average_degree = float(sum(dict(paradise_graph.degree()).values())) / float(
     paradise_graph.number_of_nodes()
 )
+average_degree
+# 2.9832619059417067
 
 
 #%%
