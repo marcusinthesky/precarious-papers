@@ -158,7 +158,7 @@ results.summary()
 
 
 # %%
-samples = renamed_distances.replace(0, np.nan).melt().value.dropna()
+samples = renamed_distances.replace(0, np.nan).subtract(1).melt().value.dropna()
 
 # b, loc, scale = stats.pareto.fit(samples)
 # distribution = stats.pareto(b, loc, scale)
@@ -172,6 +172,7 @@ def hyperparam(lam=5):
     D = (
         renamed_distances.loc[features.index, features.index]
         .replace(0, np.nan)
+        .subtract(1)
         .apply(distribution.pmf)
         .fillna(0)
     )
@@ -284,6 +285,7 @@ def hyperparam(x):
     D = (
         renamed_distances.loc[features.index, features.index]
         .replace(0, np.nan)
+        .subtract(1)
         .apply(distribution.pdf)
         .fillna(0)
     )

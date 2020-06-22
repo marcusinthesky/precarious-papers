@@ -158,7 +158,7 @@ results.summary()
 
 
 # %%
-samples = renamed_distances.replace(0, np.nan).melt().value.dropna()
+samples = renamed_distances.replace(0, np.nan).subtract(1).melt().value.dropna()
 exclude = [
     "DNN",
     "GLBS",
@@ -203,6 +203,7 @@ D = (
     (
         renamed_distances.loc[features.index, features.index]
         .replace(0, np.nan)
+        .subtract(1)
         .apply(distribution.pmf)
         .fillna(0)
     )
@@ -215,7 +216,7 @@ G = D.apply(lambda x: x / np.sum(x), 1)
 
 w = ps.lib.weights.full2W(G.to_numpy(), ids=G.index.tolist())
 kp_model_fixed = ps.model.spreg.GM_Combo_Het(
-    step1c=True,
+    # step1c=True,
     y=(y).to_numpy(),
     x=X.to_numpy(),
     w_lags=2,
@@ -236,6 +237,7 @@ def opt_lam(lam):
             (
                 renamed_distances.loc[features.index, features.index]
                 .replace(0, np.nan)
+                .subtract(1)
                 .apply(distribution.pmf)
                 .fillna(0)
             )
@@ -248,7 +250,7 @@ def opt_lam(lam):
 
         w = ps.lib.weights.full2W(G.to_numpy(), ids=G.index.tolist())
         model = ps.model.spreg.GM_Combo_Het(
-            step1c=True,
+            # step1c=True,
             y=(y).to_numpy(),
             x=X.to_numpy(),
             w_lags=2,

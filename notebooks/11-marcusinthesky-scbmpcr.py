@@ -157,13 +157,14 @@ results = model.fit()
 results.summary()
 
 # %%
-samples = renamed_distances.replace(0, np.nan).melt().value.dropna()
+samples = renamed_distances.replace(0, np.nan).subtract(1).melt().value.dropna()
 
 # %%
 distribution = stats.pareto(*stats.pareto.fit(samples))  # 3)
 D = (
     renamed_distances.loc[features.index, features.index]
     .replace(0, np.nan)
+    .subtract(1)
     .apply(distribution.pdf)
     .fillna(0)
 )

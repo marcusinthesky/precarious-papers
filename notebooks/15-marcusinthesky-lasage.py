@@ -159,7 +159,7 @@ results.summary()
 
 
 # %%
-samples = renamed_distances.replace(0, np.nan).melt().value.dropna()
+samples = renamed_distances.replace(0, np.nan).subtract(1).melt().value.dropna()
 
 X, y = features.drop(columns=["returns", "alpha"]), features.loc[:, ["returns"]]
 exclude = [
@@ -203,6 +203,7 @@ D = (
     (
         renamed_distances.loc[features.index, features.index]
         .replace(0, np.nan)
+        .subtract(1)
         .apply(distribution.pmf)
         .fillna(0)
     )
@@ -267,6 +268,7 @@ def opt_lam(lam):
             (
                 renamed_distances.loc[features.index, features.index]
                 .replace(0, np.nan)
+                .subtract(1)
                 .apply(distribution.pmf)
                 .fillna(0)
             )
@@ -542,6 +544,7 @@ def opt_lam(lam):
             (
                 renamed_distances.loc[features.index, features.index]
                 .replace(0, np.nan)
+                .subtract(1)
                 .apply(distribution.pmf)
                 .fillna(0)
             )
@@ -610,6 +613,7 @@ def opt_lam(lam):
             (
                 renamed_distances.loc[features.index, features.index]
                 .replace(0, np.nan)
+                .subtract(1)
                 .apply(distribution.pmf)
                 .fillna(0)
             )
@@ -682,6 +686,21 @@ slx_unresticted_restults.f_test(
     "rm_exog = 0, price_to_earnings_exog = 0, market_capitalization_exog = 0, profit_margin_exog=0, price_to_research_exog=0"
 )
 
+# cannot reject hypothesis all zero
+
+slx_resticted_restults = ps.model.spreg.OLS(
+    y=y.drop(["GES", "ERA", "QCOM", "GLMD"]).to_numpy(),
+    x=XGX.loc[:, ["rm", "rm_exog"]].drop(["GES", "ERA", "QCOM", "GLMD"]).to_numpy(),
+    w=ps.lib.weights.full2W(
+        G.drop(["GES", "ERA", "QCOM", "GLMD"])
+        .drop(columns=["GES", "ERA", "QCOM", "GLMD"])
+        .to_numpy()
+    ),
+    name_x=XGX.loc[:, ["rm", "rm_exog"]].columns.tolist(),
+    spat_diag=True,
+)
+print(slx_resticted_restults.summary)
+
 
 #############################
 
@@ -693,20 +712,20 @@ print(ml_sdem_fixed.summary)
 # lambda significant
 
 # %%
-print(sms.jarque_bera(ml_lag_fixed.e_filtered))
-# normal
+print(sms.jarque_bera(ml_sdem_fixed.e_filtered))
+# not normal
 
 # %%
-# gm_sdem_fixed = ps.model.spreg.GM_Error(
-#     y=y.to_numpy(), x=XGX.to_numpy(), w=w, name_x=XGX.columns.tolist()
-# )
-# print(gm_sdem_fixed.summary)
+gm_sdem_fixed = ps.model.spreg.GM_Error(
+    y=y.to_numpy(), x=XGX.to_numpy(), w=w, name_x=XGX.columns.tolist()
+)
+print(gm_sdem_fixed.summary)
 
-# # %%
-# gm_sdem_fixed = ps.model.spreg.GM_Error_Het(
-#     y=y.to_numpy(), x=XGX.to_numpy(), w=w, name_x=XGX.columns.tolist()
-# )
-# print(gm_sdem_fixed.summary)
+# %%
+gm_sdem_fixed = ps.model.spreg.GM_Error_Het(
+    y=y.to_numpy(), x=XGX.to_numpy(), w=w, name_x=XGX.columns.tolist()
+)
+print(gm_sdem_fixed.summary)
 
 # # lambda insignificant
 
@@ -715,7 +734,7 @@ ml_lag_fixed = ps.model.spreg.ML_Error(
     y=y.to_numpy(), x=X.to_numpy(), w=w, name_x=X.columns.tolist()
 )
 print(ml_lag_fixed.summary)
-# lambda significant at 0.6
+# lambda significant at 0.04
 
 
 # %%
@@ -771,6 +790,10 @@ ml_sdem_varying = ps.model.spreg.ML_Error(
 print(ml_sdem_varying.summary)
 # lambda significant 0.0132470
 
+# %%
+print(sms.jarque_bera(ml_sdem_varying.e_filtered))
+# Normal at 0.064 %
+
 
 # %%
 ml_lag_varying = ps.model.spreg.ML_Error(
@@ -781,8 +804,8 @@ print(ml_lag_varying.summary)
 
 
 # %%
-print(sms.jarque_bera(ml_lag_fixed.e_filtered))
-# normal
+print(sms.jarque_bera(ml_lag_varying.e_filtered))
+# normal p-value = 0.1976079
 
 
 r1 = np.square(ml_lag_varying.e_filtered).sum()
