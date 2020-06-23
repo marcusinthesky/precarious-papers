@@ -166,7 +166,7 @@ exclude = []
 for i in range(50):  # 29):
     # Winsorize
     X, y = features.drop(columns=["returns", "alpha"]), features.loc[:, ["returns"]]
-    samples = renamed_distances.replace(0, np.nan).subtract(1).melt().value.dropna()
+    samples = renamed_distances.replace(0, np.nan).melt().value.dropna()
     average_degree = 2.9832619059417067
 
     distribution = stats.poisson(average_degree)  # samples.mean())
@@ -194,12 +194,11 @@ for i in range(50):  # 29):
 
     tests = sms.jarque_bera(results.resid)
     print(tests)
-    if tests[1] > 0.1:
+    if tests[1] > 0.2:
         break
 
     # Prob(JB):	0.0825
 
-    # %%
     excluder = (
         pd.Series(results.get_influence().influence, index=y.index).nlargest(1).index[0]
     )
@@ -243,12 +242,28 @@ print(ols_unresticted.summary)
 XGX = pd.concat([X, (G @ X).rename(columns=lambda s: s + "_exog")], axis=1)
 
 ml_sdm_saturated_restricted = ps.model.spreg.ML_Lag(
-    y=y.drop(["GES", "ERA"]).to_numpy(),
-    x=XGX.drop(["GES", "ERA"]).to_numpy(),
-    w=ps.lib.weights.full2W(
-        G.drop(["GES", "ERA"]).drop(columns=["GES", "ERA"]).to_numpy()
-    ),
-    name_x=XGX.columns.tolist(),
+    y=y.to_numpy(),
+    x=XGX.drop(
+        columns=[
+            "profit_margin",
+            "market_capitalization",
+            "market_capitalization_exog",
+            "price_to_earnings",
+            "price_to_earnings_exog",
+        ]
+    ).to_numpy(),
+    w=ps.lib.weights.full2W(G.to_numpy()),
+    # w_lags=2,
+    name_x=XGX.drop(
+        columns=[
+            "profit_margin",
+            "market_capitalization",
+            "market_capitalization_exog",
+            "price_to_earnings",
+            "price_to_earnings_exog",
+        ]
+    ).columns.tolist(),
+    method="ord",
     spat_diag=True,
 )
 print(ml_sdm_saturated_restricted.summary)

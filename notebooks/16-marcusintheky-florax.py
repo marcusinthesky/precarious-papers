@@ -162,12 +162,11 @@ fig, ax = plt.subplots(figsize=(12, 8))
 fig = sm.graphics.influence_plot(results, ax=ax, criterion="cooks")
 
 # %%
-
 exclude = []
 for i in range(29):
     # Winsorize
     X, y = features.drop(columns=["returns", "alpha"]), features.loc[:, ["returns"]]
-    samples = renamed_distances.replace(0, np.nan).subtract(1).melt().value.dropna()
+    samples = renamed_distances.replace(0, np.nan).melt().value.dropna()
     average_degree = 2.9832619059417067
 
     distribution = stats.poisson(average_degree)  # samples.mean())
@@ -175,7 +174,6 @@ for i in range(29):
     D = (
         renamed_distances.loc[features.index, features.index]
         .replace(0, np.nan)
-        .subtract(1)
         .apply(distribution.pmf)
         .fillna(0)
     )
@@ -195,12 +193,11 @@ for i in range(29):
 
     tests = sms.jarque_bera(results.resid)
     print(tests)
-    if tests[1] > 0.15:
+    if tests[1] > 0.2:
         break
 
     # Prob(JB):	0.0825
 
-    # %%
     excluder = (
         pd.Series(results.get_influence().influence, index=y.index).nlargest(1).index[0]
     )
@@ -256,7 +253,6 @@ def opt_lam(lam):
             (
                 renamed_distances.loc[features.index, features.index]
                 .replace(0, np.nan)
-                .subtract(1)
                 .apply(distribution.pmf)
                 .fillna(0)
             )
@@ -277,7 +273,8 @@ def opt_lam(lam):
             moran=True,
         )
 
-        return -model.ar2, model, G
+        # Robust LM (error) seems most robust lets optimize for it
+        return model.rlm_error[-1], model, G
 
     except:
         print("error")
@@ -293,16 +290,19 @@ print(ols_unresticted_varying.summary)
 
 # %%
 # SER
-
 ml_ser_fixed = ps.model.spreg.ML_Error(
-    y.to_numpy(), X.to_numpy(), name_x=X.columns.tolist(), w=w, spat_diag=True,
+    y.to_numpy(),
+    X.to_numpy(),
+    name_x=X.columns.tolist(),
+    w=ps.lib.weights.full2W(G_opt.to_numpy(), ids=G_opt.index.tolist()),
+    spat_diag=True,
 )
 
 print(ml_ser_fixed.summary)
 
 # %%
 print(sms.jarque_bera(ml_ser_fixed.e_filtered))
-# Normal 0.1976079
+# Normal 0.39342951
 
 # %%
 # Heteroskedasticity tests¶
@@ -312,19 +312,19 @@ import statsmodels.stats.api as sms
 name = ["Lagrange multiplier statistic", "p-value", "f-value", "f p-value"]
 test = sms.het_breuschpagan(ml_ser_fixed.e_filtered, X)
 list(zip(name, test))
-# 6.184554197646399e-06
+# 4.9780884071875575e-06
 # a p-value below an appropriate threshold (e.g. p < 0.05) then the null hypothesis of homoskedasticity is rejected and heteroskedasticity assumed
 
 ## Goldfeld-Quandt test:
 name = ["F statistic", "p-value"]
 test = sms.het_goldfeldquandt(ml_ser_fixed.e_filtered, X)
 list(zip(name, test))
-#  0.9939822296514494
+#  0.9897484938247844
 # null hypothesis of homoskedastic errors
 
 
 # %%
-# OLS : unrestricted, varying \lambda
+# ML : unrestricted, varying \lambda
 def opt_lam(lam):
     try:
         print(lam)
@@ -334,7 +334,6 @@ def opt_lam(lam):
             (
                 renamed_distances.loc[features.index, features.index]
                 .replace(0, np.nan)
-                .subtract(1)
                 .apply(distribution.pmf)
                 .fillna(0)
             )
@@ -350,11 +349,11 @@ def opt_lam(lam):
             y.to_numpy(), X.to_numpy(), name_x=X.columns.tolist(), w=w, spat_diag=True,
         )
 
-        return -model.pr2, model, G
+        return model.betas[-1], model, G
 
     except:
         print("error")
-        return 0, None, None
+        return 1, None, None
 
 
 best_param = minimize(lambda x: opt_lam(x)[0], x0=np.array([average_degree]), tol=1e-6,)
@@ -366,7 +365,7 @@ print(ml_sem_unresticted_varying.summary)
 
 # %%
 print(sms.jarque_bera(ml_sem_unresticted_varying.e_filtered))
-# Normal 0.19517863
+# Normal 0.31438881
 
 # %%
 # Heteroskedasticity tests¶
@@ -376,15 +375,8 @@ import statsmodels.stats.api as sms
 name = ["Lagrange multiplier statistic", "p-value", "f-value", "f p-value"]
 test = sms.het_breuschpagan(ml_sem_unresticted_varying.e_filtered, X)
 list(zip(name, test))
-# 6.222912079229905e-06
+# 5.113715535483734e-06
 # a p-value below an appropriate threshold (e.g. p < 0.05) then the null hypothesis of homoskedasticity is rejected and heteroskedasticity assumed
-
-## Goldfeld-Quandt test:
-name = ["F statistic", "p-value"]
-test = sms.het_goldfeldquandt(ml_sem_unresticted_varying.e_filtered, X)
-list(zip(name, test))
-#  0.994032761410099
-# null hypothesis of homoskedastic errors
 
 # white test:
 test = sms.het_white(ml_sem_unresticted_varying.e_filtered, X)
@@ -407,7 +399,6 @@ OLS(
 # market_capitalization	8.522e-13	3.02e-13	2.822	0.006	2.54e-13	1.45e-12
 
 # %%
-OLS(ml_sem_unresticted_varying.e_filtered, X).fit().summary()
 
 # %%
 XGX_opt_restricted = pd.concat(
@@ -418,22 +409,18 @@ XGX_opt_restricted = pd.concat(
         ),
     ],
     axis=1,
-)
-ml_sdem_restricted = ps.model.spreg.GM_Error(
-    y.drop(["ERA", "GES"]).to_numpy(),
-    XGX_opt_restricted.drop(["ERA", "GES"]).to_numpy(),
+).drop(columns=["market_capitalization", "profit_margin", "price_to_research"])
+ml_sdem_restricted = ps.model.spreg.ML_Error(
+    y.to_numpy(),
+    XGX_opt_restricted.to_numpy(),
     name_x=XGX_opt_restricted.columns.tolist(),
-    w=ps.lib.weights.full2W(
-        G_opt.drop(["ERA", "GES"]).drop(columns=["ERA", "GES"]).to_numpy(),
-        ids=G.drop(["ERA", "GES"]).index.tolist(),
-    ),
-    # spat_diag=True,
+    w=ps.lib.weights.full2W(G_opt.to_numpy(), ids=G.index.tolist(),),
 )
 
 print(ml_sdem_restricted.summary)
 
 print(sms.jarque_bera(ml_sdem_restricted.e_filtered))
-# 0.04378934
+# 0.03808398
 
 
 # %%
@@ -445,7 +432,7 @@ XGX_opt_restricted = pd.concat(
         ),
     ],
     axis=1,
-)
+).drop(columns=["market_capitalization", "profit_margin", "price_to_research"])
 gm_sdem_restricted = ps.model.spreg.GM_Error(
     y.to_numpy(),
     XGX_opt_restricted.to_numpy(),
@@ -457,31 +444,47 @@ print(gm_sdem_restricted.summary)
 
 #             Variable     Coefficient       Std.Error     z-Statistic     Probability
 # ------------------------------------------------------------------------------------
-#             CONSTANT       0.0084609       0.0141569       0.5976523       0.5500720
-#                   rm      -7.1855364       2.1808459      -3.2948391       0.0009848
-#    price_to_earnings      -0.0059613       0.0026862      -2.2192336       0.0264708
-# market_capitalization      -0.0000000       0.0000000      -0.6478164       0.5171037
-#        profit_margin       0.0106866       0.0139421       0.7664948       0.4433819
-#    price_to_research       0.0000048       0.0000034       1.3854999       0.1658997
-#         rm_exogenous     -10.0784827       8.1018632      -1.2439710       0.2135102
-# market_capitalization_exogenous       0.0000000       0.0000000       2.4428897       0.0145702
-#               lambda      -0.8543645
+#             CONSTANT       0.0173273       0.0149347       1.1602010       0.2459670
+#                   rm      -6.6103842       2.0942004      -3.1565194       0.0015966
+#    price_to_earnings      -0.0053558       0.0025929      -2.0655987       0.0388664
+#         rm_exogenous     -15.4207783       8.9555455      -1.7219251       0.0850831
+# market_capitalization_exogenous       0.0000000       0.0000000       2.8493375       0.0043810
+#               lambda      -1.0000000
+
+# Heteroskedasticity tests¶
+## Breush-Pagan test:
+import statsmodels.stats.api as sms
+
+name = ["Lagrange multiplier statistic", "p-value", "f-value", "f p-value"]
+test = sms.het_breuschpagan(gm_sdem_restricted.e_filtered, X)
+list(zip(name, test))
+# 9.45124079325539e-06
+# a p-value below an appropriate threshold (e.g. p < 0.05) then the null hypothesis of homoskedasticity is rejected and heteroskedasticity assumed
+
+# white test:
+test = sms.het_white(gm_sdem_restricted.e_filtered, X)
+list(zip(name, test))
+# 'p-value', 1.0
+# null hypothesis of homoskedasticity
 
 # %%
 XGX_opt_restricted = pd.concat(
     [
         X,
-        (G_opt @ X.loc[:, ["rm", "market_capitalization"]]).rename(
-            columns=lambda s: s + "_exogenous"
-        ),
+        (
+            G_opt
+            @ X.drop(
+                columns=["price_to_earnings", "profit_margin", "price_to_research"]
+            )
+        ).rename(columns=lambda s: s + "_exogenous"),
     ],
     axis=1,
-)
+).drop(columns=["market_capitalization", "profit_margin"])
 gm_sdem_het_restricted = ps.model.spreg.GM_Error_Het(
     y.to_numpy(),
     XGX_opt_restricted.to_numpy(),
     name_x=XGX_opt_restricted.columns.tolist(),
-    w=w,
+    w=ps.lib.weights.full2W(G_opt.to_numpy(), ids=G_opt.index.tolist(),),
 )
 
 print(gm_sdem_het_restricted.summary)
@@ -497,3 +500,124 @@ print(gm_sdem_het_restricted.summary)
 #         rm_exogenous     -11.4551624       7.1779106      -1.5958909       0.1105131
 # market_capitalization_exogenous       0.0000000       0.0000000       1.9440723       0.0518867
 #               lambda      -0.7609893       0.5418200      -1.4045059       0.1601683
+
+XGX_opt_restricted = pd.concat(
+    [
+        X,
+        (
+            G_opt
+            @ X.drop(
+                columns=[
+                    "price_to_earnings",
+                    "profit_margin",
+                    "price_to_research",
+                    "market_capitalization",
+                ]
+            )
+        ).rename(columns=lambda s: s + "_exogenous"),
+    ],
+    axis=1,
+).drop(columns=["market_capitalization", "profit_margin", "price_to_earnings"])
+slx_restricted = ps.model.spreg.OLS(
+    y.to_numpy(),
+    XGX_opt_restricted.to_numpy(),
+    name_x=XGX_opt_restricted.columns.tolist(),
+    w=ps.lib.weights.full2W(G_opt.to_numpy(), ids=G.index.tolist(),),
+    robust="white",  # heteroskadastistic consistent
+    spat_diag=True,
+    moran=True,
+)
+
+print(slx_restricted.summary)
+
+
+exclude = []
+for i in range(50):
+    # Winsorize
+    X, y = features.drop(columns=["returns", "alpha"]), features.loc[:, ["returns"]]
+    samples = renamed_distances.replace(0, np.nan).melt().value.dropna()
+    # average_degree = 2.9832619059417067
+
+    distribution = stats.poisson(best_param.x)  # average_degree)  # samples.mean())
+
+    D = (
+        renamed_distances.loc[features.index, features.index]
+        .replace(0, np.nan)
+        .apply(distribution.pmf)
+        .fillna(0)
+    )
+
+    try:
+        X = X.drop(exclude)
+        y = y.drop(exclude)
+        # G = G.drop(exclude).drop(columns=exclude)
+        D = D.drop(exclude).drop(columns=exclude)
+    except:
+        print("skipped")
+        pass
+
+    G = D.apply(lambda x: x / np.sum(x), 1)
+
+    XGX_opt_restricted = pd.concat(
+        [
+            X,
+            (
+                G
+                @ X.drop(
+                    columns=[
+                        "price_to_earnings",
+                        "profit_margin",
+                        "price_to_research",
+                        "market_capitalization",
+                    ]
+                )
+            ).rename(columns=lambda s: s + "_exogenous"),
+        ],
+        axis=1,
+    ).drop(columns=["market_capitalization", "profit_margin", "price_to_earnings"])
+
+    model = OLS(y, XGX_opt_restricted.assign(alpha=1), cov_type="H3")
+    results = model.fit()
+    results.summary()
+
+    tests = sms.jarque_bera(results.resid)
+    print(tests)
+    if tests[1] > 0.05:
+        break
+
+    # Prob(JB):	0.0825
+
+    excluder = (
+        pd.Series(results.get_influence().influence, index=y.index).nlargest(1).index[0]
+    )
+    print(excluder)
+    exclude.append(excluder)
+
+    # cook = pd.Series(results.get_influence().cooks_distance[0], index=y.index).nlargest(1).index[0]
+    # print(cook)
+    # if exclude != cook:
+    #     exclude.append(cook)
+
+
+# %%
+results.summary()
+
+# %%
+# Reject normality assumption Leptokurtic present
+fig, ax = plt.subplots(figsize=(12, 8))
+fig = sm.graphics.influence_plot(results, ax=ax, criterion="DFFITS")
+
+# %%
+pd.Series(results.get_influence().influence, index=y.index).nlargest(5)
+
+
+slx_varying_resticted_filtered = ps.model.spreg.OLS(
+    y=y.to_numpy(),
+    x=XGX_opt_restricted.to_numpy(),
+    name_x=XGX_opt_restricted.columns.tolist(),
+    w=ps.lib.weights.full2W(G.to_numpy(), ids=G.index.tolist(),),
+    spat_diag=True,
+    moran=True,
+)
+
+print(slx_varying_resticted_filtered.summary)

@@ -166,7 +166,7 @@ exclude = []
 for i in range(50):  # 29):
     # Winsorize
     X, y = features.drop(columns=["returns", "alpha"]), features.loc[:, ["returns"]]
-    samples = renamed_distances.replace(0, np.nan).subtract(1).melt().value.dropna()
+    samples = renamed_distances.replace(0, np.nan).melt().value.dropna()
     average_degree = 2.9832619059417067
 
     distribution = stats.poisson(0.8)  # average_degree)  # samples.mean())

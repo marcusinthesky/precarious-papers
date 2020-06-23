@@ -158,7 +158,7 @@ results.summary()
 
 
 # %%
-samples = renamed_distances.replace(0, np.nan).subtract(1).melt().value.dropna()
+samples = renamed_distances.replace(0, np.nan).melt().value.dropna()
 exclude = [
     "DNN",
     "GLBS",
