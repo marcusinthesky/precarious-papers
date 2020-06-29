@@ -216,3 +216,15 @@ iex_matched_entities:
   type: pandas.ParquetDataSet
   filepath: data/01_raw/iex_matched_symbols.csv
   versioned: True
+
+
+# 04_features
+features:
+  type: pandas.ParquetDataSet
+  filepath: data/04_features/features.parquet
+  versioned: True
+
+renamed_distances:
+  type: pandas.ParquetDataSet
+  filepath: data/04_features/renamed_distances.parquet
+  versioned: True

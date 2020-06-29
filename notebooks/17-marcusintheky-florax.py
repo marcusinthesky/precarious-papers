@@ -24,135 +24,10 @@ hv.extension("bokeh")
 
 #%%
 # matched entities
-matched = context.catalog.load("iex_matched_entities")  # scores_matches)
+features = context.catalog.load("features")
+renamed_distances = context.catalog.load("renamed_distances")
 
-distances = context.io.load("paradise_distances")
-price = context.io.load("paradise_price")
-indices = context.io.load("indices")
-balancesheet = context.catalog.load("balance_sheet")
-release = pd.to_datetime(context.params["release"]["paradise_papers"])
-income = context.catalog.load("income_statement")
-
-
-# %%
-index = (
-    matched.groupby("symbol")
-    .apply(lambda df: df.sample(1))
-    .set_index("symbol")
-    .exchange
-)
-
-rf = ((1 + 3.18e-05) ** 5) - 1
-
-rm_rates = (
-    index.rename("index")
-    .to_frame()
-    .merge(
-        indices.pct_change()
-        .add(1)
-        .cumprod()
-        .tail(1)
-        .subtract(1)
-        .T.rename(columns=lambda x: "rm"),
-        left_on="index",
-        right_index=True,
-    )
-    .rm.subtract(rf)
-)
-
-returns = (
-    price.loc[:, pd.IndexSlice[:, "close"]]
-    .pct_change()
-    .add(1)
-    .cumprod()
-    .tail(1)
-    .subtract(1)
-    .subtract(rf)
-)
-
-returns.columns = returns.columns.droplevel(1)
-returns = returns.T.rename(columns=lambda x: "returns").dropna()
-returns["excess"] = returns["returns"].subtract(rm_rates.loc[returns.index])
-returns["rm"] = rm_rates.loc[returns.index].to_frame().to_numpy()
-
-# remove islands
-inner_index = returns.join(
-    (
-        distances.where(lambda df: df.sum() > 0)
-        .dropna(how="all")
-        .T.where(lambda df: df.sum() > 0)
-        .dropna(how="all")
-    ),
-    how="inner",
-).index
-
-renamed_distances = distances.loc[inner_index, inner_index]
-returns = returns.loc[inner_index, :]
-exchange = pd.get_dummies(data=index).loc[inner_index, :]
-communities = (
-    pd.get_dummies(
-        renamed_distances.where(
-            lambda df: df.isna(), lambda df: df.apply(lambda x: x.index)
-        )
-        .fillna("")
-        .apply(lambda df: hash(df.str.cat()))
-    )
-    .T.reset_index(drop=True)
-    .T
-)
-communities = communities.loc[:, communities.sum() > 1]
-
-factors = pd.merge_asof(
-    returns.reset_index()
-    .rename(columns={"index": "symbol"})
-    .assign(reportDate=release)
-    .sort_values("reportDate"),
-    balancesheet.merge(
-        income.drop(columns=["minorityInterest", "fiscalDate", "currency"]),
-        on=["reportDate", "symbol"],
-    )
-    .assign(reportDate=lambda df: pd.to_datetime(df.reportDate))
-    .sort_values("reportDate"),
-    on="reportDate",
-    by="symbol",
-    direction="backward",
-)
-
-average_price = (
-    price.loc[:, pd.IndexSlice[:, "close"]]
-    .mean()
-    .reset_index()
-    .rename(columns={"level_0": "symbol", 0: "price"})
-    .set_index("symbol")
-    .price
-)
-features = (
-    factors.set_index("symbol")
-    .fillna(factors.mean())
-    .assign(alpha=1)
-    .select_dtypes(include="number")
-    .join(average_price)
-    .assign(
-        price_to_earnings=lambda df: df.price / (df.totalAssets / df.commonStock),
-        market_capitalization=lambda df: df.price * df.commonStock,
-        profit_margin=lambda df: df.grossProfit / df.totalRevenue,
-        price_to_research=lambda df: (df.price * df.commonStock)
-        / df.researchAndDevelopment,
-    )
-    .loc[
-        :,
-        [
-            "rm",
-            "price_to_earnings",
-            "market_capitalization",
-            "profit_margin",
-            "price_to_research",
-            "alpha",
-            "returns",
-        ],
-    ]
-)
-
+samples = renamed_distances.melt().value.dropna()
 model = OLS(features.returns, features.drop(columns=["returns"]))
 results = model.fit()
 results.summary()
@@ -166,6 +41,7 @@ exclude = []
 for i in range(29):
     # Winsorize
     X, y = features.drop(columns=["returns", "alpha"]), features.loc[:, ["returns"]]
+    y = y.apply(stats.mstats.winsorize, limits=[0.05, 0.05])
     samples = renamed_distances.replace(0, np.nan).melt().value.dropna()
     average_degree = 2.9832619059417067
 
@@ -274,7 +150,7 @@ def opt_lam(lam):
         )
 
         # Robust LM (error) seems most robust lets optimize for it
-        return model.rlm_error[-1], model, G
+        return model.rlm_lag[-1], model, G
 
     except:
         print("error")
@@ -286,6 +162,17 @@ best_param = minimize(lambda x: opt_lam(x)[0], x0=np.array([average_degree]), to
 pr2_e, ols_unresticted_varying, G_opt = opt_lam(best_param.x)
 print(best_param.x)
 print(ols_unresticted_varying.summary)
+
+# lam opt = 4.03330841
+
+#             Variable     Coefficient       Std.Error     t-Statistic     Probability
+# ------------------------------------------------------------------------------------
+#             CONSTANT       0.0014657       0.0052182       0.2808851       0.7792863
+#                   rm      -4.4774835       1.9443717      -2.3027919       0.0230276
+#    price_to_earnings      -0.0017466       0.0019693      -0.8869139       0.3769142
+# market_capitalization       0.0000000       0.0000000       0.0107371       0.9914512
+#        profit_margin       0.0104346       0.0121419       0.8593851       0.3918560
+#    price_to_research       0.0000052       0.0000026       2.0188798       0.0457474
 
 
 # %%
@@ -302,7 +189,7 @@ print(ml_ser_fixed.summary)
 
 # %%
 print(sms.jarque_bera(ml_ser_fixed.e_filtered))
-# Normal 0.39342951
+# Normal 0.467073
 
 # %%
 # Heteroskedasticity tests¶
@@ -312,14 +199,14 @@ import statsmodels.stats.api as sms
 name = ["Lagrange multiplier statistic", "p-value", "f-value", "f p-value"]
 test = sms.het_breuschpagan(ml_ser_fixed.e_filtered, X)
 list(zip(name, test))
-# 4.9780884071875575e-06
+# 0.00010472361799582236
 # a p-value below an appropriate threshold (e.g. p < 0.05) then the null hypothesis of homoskedasticity is rejected and heteroskedasticity assumed
 
-## Goldfeld-Quandt test:
+## white test:
 name = ["F statistic", "p-value"]
-test = sms.het_goldfeldquandt(ml_ser_fixed.e_filtered, X)
+test = sms.het_white(ml_ser_fixed.e_filtered, X)
 list(zip(name, test))
-#  0.9897484938247844
+#  1
 # null hypothesis of homoskedastic errors
 
 
@@ -362,10 +249,12 @@ pr2_e, ml_sem_unresticted_varying, G_opt = opt_lam(best_param.x)
 print(best_param.x)
 print(ml_sem_unresticted_varying.summary)
 
+# opt lam = 3.99
+
 
 # %%
 print(sms.jarque_bera(ml_sem_unresticted_varying.e_filtered))
-# Normal 0.31438881
+# Normal 0.46539263
 
 # %%
 # Heteroskedasticity tests¶
@@ -375,7 +264,7 @@ import statsmodels.stats.api as sms
 name = ["Lagrange multiplier statistic", "p-value", "f-value", "f p-value"]
 test = sms.het_breuschpagan(ml_sem_unresticted_varying.e_filtered, X)
 list(zip(name, test))
-# 5.113715535483734e-06
+# 0.00010546212393206634
 # a p-value below an appropriate threshold (e.g. p < 0.05) then the null hypothesis of homoskedasticity is rejected and heteroskedasticity assumed
 
 # white test:
@@ -395,10 +284,9 @@ OLS(
 # conclude spatial heteroskedasticity
 
 # 	coef	std err	t	P>|t|	[0.025	0.975]
-# rm	-12.6364	4.619	-2.736	0.007	-21.786	-3.486
-# market_capitalization	8.522e-13	3.02e-13	2.822	0.006	2.54e-13	1.45e-12
+# rm	-11.0171	3.766	-2.926	0.004	-18.471	-3.563
+# market_capitalization	6.416e-13	2.15e-13	2.979	0.003	2.15e-13	1.07e-12
 
-# %%
 
 # %%
 XGX_opt_restricted = pd.concat(
@@ -414,13 +302,31 @@ ml_sdem_restricted = ps.model.spreg.ML_Error(
     y.to_numpy(),
     XGX_opt_restricted.to_numpy(),
     name_x=XGX_opt_restricted.columns.tolist(),
-    w=ps.lib.weights.full2W(G_opt.to_numpy(), ids=G.index.tolist(),),
+    w=ps.lib.weights.full2W(G_opt.to_numpy(), ids=G_opt.index.tolist(),),
 )
 
 print(ml_sdem_restricted.summary)
 
 print(sms.jarque_bera(ml_sdem_restricted.e_filtered))
-# 0.03808398
+# 0.68366267
+
+
+# %%
+# Heteroskedasticity tests¶
+## Breush-Pagan test:
+import statsmodels.stats.api as sms
+
+name = ["Lagrange multiplier statistic", "p-value", "f-value", "f p-value"]
+test = sms.het_breuschpagan(ml_sdem_restricted.e_filtered, X)
+list(zip(name, test))
+# 2.812656689440267e-05
+# a p-value below an appropriate threshold (e.g. p < 0.05) then the null hypothesis of homoskedasticity is rejected and heteroskedasticity assumed
+
+# white test:
+test = sms.het_white(ml_sdem_restricted.e_filtered, X)
+list(zip(name, test))
+# 'p-value', 1.0
+# null hypothesis of homoskedasticity
 
 
 # %%
@@ -444,11 +350,11 @@ print(gm_sdem_restricted.summary)
 
 #             Variable     Coefficient       Std.Error     z-Statistic     Probability
 # ------------------------------------------------------------------------------------
-#             CONSTANT       0.0173273       0.0149347       1.1602010       0.2459670
-#                   rm      -6.6103842       2.0942004      -3.1565194       0.0015966
-#    price_to_earnings      -0.0053558       0.0025929      -2.0655987       0.0388664
-#         rm_exogenous     -15.4207783       8.9555455      -1.7219251       0.0850831
-# market_capitalization_exogenous       0.0000000       0.0000000       2.8493375       0.0043810
+#             CONSTANT       0.0332839       0.0147710       2.2533300       0.0242384
+#                   rm      -5.2568759       1.7709625      -2.9683722       0.0029938
+#    price_to_earnings      -0.0016499       0.0017774      -0.9282971       0.3532535
+#         rm_exogenous     -24.5862776       9.0511391      -2.7163738       0.0066001
+# market_capitalization_exogenous       0.0000000       0.0000000       2.5514177       0.0107286
 #               lambda      -1.0000000
 
 # Heteroskedasticity tests¶
@@ -458,7 +364,7 @@ import statsmodels.stats.api as sms
 name = ["Lagrange multiplier statistic", "p-value", "f-value", "f p-value"]
 test = sms.het_breuschpagan(gm_sdem_restricted.e_filtered, X)
 list(zip(name, test))
-# 9.45124079325539e-06
+# 2.4856660552697322e-05
 # a p-value below an appropriate threshold (e.g. p < 0.05) then the null hypothesis of homoskedasticity is rejected and heteroskedasticity assumed
 
 # white test:
@@ -479,7 +385,8 @@ XGX_opt_restricted = pd.concat(
         ).rename(columns=lambda s: s + "_exogenous"),
     ],
     axis=1,
-).drop(columns=["market_capitalization", "profit_margin"])
+)  # .drop(columns=["rm_exogenous", "market_capitalization_exogenous", "market_capitalization", "profit_margin", "price_to_earnings"])
+
 gm_sdem_het_restricted = ps.model.spreg.GM_Error_Het(
     y.to_numpy(),
     XGX_opt_restricted.to_numpy(),
@@ -522,7 +429,7 @@ slx_restricted = ps.model.spreg.OLS(
     y.to_numpy(),
     XGX_opt_restricted.to_numpy(),
     name_x=XGX_opt_restricted.columns.tolist(),
-    w=ps.lib.weights.full2W(G_opt.to_numpy(), ids=G.index.tolist(),),
+    w=ps.lib.weights.full2W(G_opt.to_numpy(), ids=G_opt.index.tolist(),),
     robust="white",  # heteroskadastistic consistent
     spat_diag=True,
     moran=True,
