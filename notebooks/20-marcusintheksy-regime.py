@@ -98,7 +98,7 @@ X, r, y = (
     F.regime,
     F.loc[:, ["returns"]],
 )
-distribution = stats.poisson(4)
+distribution = stats.poisson(2.8)
 
 f = r.to_numpy().reshape(-1, 1)
 
@@ -112,8 +112,21 @@ G = (
 )
 
 
+# %%
+def best_winsor(l):
+    print(l)
+    y_clip = y.apply(stats.mstats.winsorize, limits=[l, l])
+    JB, JBpv, skew, kurtosis = sms.jarque_bera(y_clip)
+    return -JBpv.item()
+
+
+best_clip = minimize(best_winsor, x0=0.06, method="nelder-mead")
+
+
+# %%
+
 ols = ps.model.spreg.OLS(
-    y=y.apply(stats.mstats.winsorize, limits=[0.075, 0.075]).to_numpy(),
+    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
     x=X.to_numpy(),
     spat_diag=True,
     moran=True,
@@ -124,12 +137,47 @@ ols = ps.model.spreg.OLS(
 print(ols.summary)
 
 # %%
-sar = ps.model.spreg.GM_Lag(
-    y=y.apply(stats.mstats.winsorize, limits=[0.075, 0.075]).to_numpy(),
+ols_regime = ps.model.spreg.OLS_Regimes(
+    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
     x=X.to_numpy(),
+    regimes=r.to_numpy(),
+    spat_diag=True,
+    moran=True,
+    name_x=X.columns.tolist(),
+    w=ps.lib.weights.full2W(G.to_numpy()),
+)
+
+print(ols_regime.summary)
+
+# %%
+for c, d in X.items():
+    print(OLS(d, (G @ d).rename(c).to_frame().assign(alpha=1)).fit().summary())
+
+X_unsaturated = X.drop(columns=["market_capitalization", "profit_margin"])
+
+
+# %%
+sar = ps.model.spreg.GM_Lag(
+    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    x=X_unsaturated.to_numpy(),
     spat_diag=True,
     w_lags=2,
-    name_x=X.columns.tolist(),
+    name_x=X_unsaturated.columns.tolist(),
+    w=ps.lib.weights.full2W(G.to_numpy()),
+)
+
+print(sar.summary)
+
+# %%
+sar = ps.model.spreg.GM_Lag_Regimes(
+    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    x=X_unsaturated.drop(columns=["price_to_earnings"]).to_numpy(),
+    regimes=r.astype(int).astype(str).apply(lambda s: "t=" + s + "_").to_numpy(),
+    name_y="r_i",
+    name_regimes="event_day",
+    spat_diag=True,
+    w_lags=2,
+    name_x=X_unsaturated.drop(columns=["price_to_earnings"]).columns.tolist(),
     w=ps.lib.weights.full2W(G.to_numpy()),
 )
 
@@ -137,27 +185,36 @@ print(sar.summary)
 
 # %%
 ser = ps.model.spreg.GM_Error_Het(
-    y=y.apply(stats.mstats.winsorize, limits=[0.075, 0.075]).to_numpy(),
-    x=X.to_numpy(),
+    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    x=X_unsaturated.to_numpy(),
     step1c=True,
-    name_x=X.columns.tolist(),
+    name_x=X_unsaturated.columns.tolist(),
     w=ps.lib.weights.full2W(G.to_numpy()),
 )
 
 print(ser.summary)
 
 # %%
+ser_regimes = ps.model.spreg.GM_Error_Het_Regimes(
+    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    x=X_unsaturated.drop(columns=["price_to_earnings"]).to_numpy(),
+    regimes=r.astype(int).astype(str).apply(lambda s: "t=" + s + "_").to_numpy(),
+    name_y="r_i",
+    name_regimes="event_day",
+    step1c=True,
+    name_x=X_unsaturated.drop(columns=["price_to_earnings"]).columns.tolist(),
+    w=ps.lib.weights.full2W(G.to_numpy()),
+)
+
+print(ser_regimes.summary)
+
+# %%
 XGX = pd.concat(
-    [
-        X,
-        (G @ X.drop(columns=["market_capitalization", "price_to_research"])).rename(
-            columns=lambda s: s + "_exogenous"
-        ),
-    ],
+    [X_unsaturated, (G @ X_unsaturated).rename(columns=lambda s: s + "_exogenous"),],
     axis=1,
 )
-sdm = ps.model.spreg.GM_Lag(
-    y=y.apply(stats.mstats.winsorize, limits=[0.075, 0.075]).to_numpy(),
+sdm = ps.model.spreg.ML_Lag(
+    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
     x=XGX.to_numpy(),
     spat_diag=True,
     name_x=XGX.columns.tolist(),
@@ -166,17 +223,170 @@ sdm = ps.model.spreg.GM_Lag(
 
 print(sdm.summary)
 
-# Anselin-Kelejian Test             1           4.990          0.0255
-# There is residual spatial correlation
+# %%
+sdm = ps.model.spreg.ML_Lag_Regimes(
+    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    x=XGX.to_numpy(),
+    regimes=r.astype(int).astype(str).apply(lambda s: "t=" + s + "_").to_numpy(),
+    name_y="r_i",
+    name_regimes="event_day",
+    spat_diag=True,
+    name_x=XGX.columns.tolist(),
+    w=ps.lib.weights.full2W(G.to_numpy()),
+)
+
+print(sdm.summary)
+
+# %%
+slx_regimes = ps.model.spreg.OLS_Regimes(
+    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    x=XGX.to_numpy(),
+    regimes=r.astype(int).astype(str).apply(lambda s: "t=" + s + "_").to_numpy(),
+    name_y="r_i",
+    name_regimes="event_day",
+    spat_diag=True,
+    moran=True,
+    name_x=XGX.columns.tolist(),
+    w=ps.lib.weights.full2W(G.to_numpy()),
+)
+
+print(slx_regimes.summary)
 
 
 # %%
-sdem = ps.model.spreg.GM_Error_Het(
-    y=y.apply(stats.mstats.winsorize, limits=[0.075, 0.075]).to_numpy(),
+kp = ps.model.spreg.GM_Combo_Het(
+    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    x=X.to_numpy(),
+    step1c=False,
+    w_lags=2,
+    name_x=X.columns.tolist(),
+    w=ps.lib.weights.full2W(G.to_numpy()),
+)
+
+print(kp.summary)
+
+# %%
+kp_regimes = ps.model.spreg.GM_Combo_Het_Regimes(
+    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    x=X_unsaturated.drop(columns=["price_to_earnings"]).to_numpy(),
+    regimes=r.astype(int).astype(str).apply(lambda s: "t=" + s + "_").to_numpy(),
+    name_y="r_i",
+    w_lags=2,
+    name_regimes="event_day",
+    step1c=True,
+    name_x=X_unsaturated.drop(columns=["price_to_earnings"]).columns.tolist(),
+    w=ps.lib.weights.full2W(G.to_numpy()),
+)
+
+print(kp_regimes.summary)
+
+
+# %%
+H = (
+    G.replace(0, np.nan)
+    .apply(lambda x: x == x.max(), axis=1)
+    .apply(lambda x: x / x.sum(), axis=1)
+    .fillna(0)
+)
+
+XGX = pd.concat([X, (G @ X).rename(columns=lambda s: s + "_exogenous"),], axis=1,)
+sdem_nn_regimes = ps.model.spreg.GM_Error_Het_Regimes(
+    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
     x=XGX.to_numpy(),
+    regimes=r.astype(int).astype(str).apply(lambda s: "t=" + s + "_").to_numpy(),
+    name_y="r_i",
+    name_regimes="event_day",
     step1c=True,
     name_x=XGX.columns.tolist(),
     w=ps.lib.weights.full2W(G.to_numpy()),
 )
 
-print(sdem.summary)
+print(sdem_nn_regimes.summary)
+
+# %%
+sdm_nn_regimes = ps.model.spreg.GM_Lag_Regimes(
+    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    x=XGX.to_numpy(),
+    regimes=r.astype(int).astype(str).apply(lambda s: "t=" + s + "_").to_numpy(),
+    name_y="r_i",
+    name_regimes="event_day",
+    spat_diag=True,
+    name_x=XGX.columns.tolist(),
+    w=ps.lib.weights.full2W(G.to_numpy()),
+)
+
+print(sdm_nn_regimes.summary)
+
+
+# %%
+
+kp_nn = ps.model.spreg.GM_Combo_Het(
+    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    x=X.to_numpy(),
+    step1c=True,
+    w_lags=2,
+    name_x=X.columns.tolist(),
+    w=ps.lib.weights.full2W(H.to_numpy()),
+)
+
+print(kp_nn.summary)
+
+
+# %%
+kp_regimes = ps.model.spreg.GM_Combo_Het_Regimes(
+    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    x=X.drop(
+        columns=["profit_margin", "price_to_earnings", "market_capitalization"]
+    ).to_numpy(),
+    step1c=True,
+    regimes=r.astype(int).astype(str).apply(lambda s: "t=" + s + "_").to_numpy(),
+    name_y="r_i",
+    name_regimes="event_day",
+    w_lags=2,
+    name_x=X.drop(
+        columns=["profit_margin", "price_to_earnings", "market_capitalization"]
+    ).columns.tolist(),
+    w=ps.lib.weights.full2W(H.to_numpy()),
+)
+
+print(kp_regimes.summary)
+
+# %%
+sms.jarque_bera(kp_regimes.e_filtered)
+
+
+# %%
+kp_nn_regimes = ps.model.spreg.GM_Combo_Het_Regimes(
+    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    x=X.drop(columns=["market_capitalization"]).to_numpy(),
+    regimes=r.to_numpy(),
+    step1c=True,
+    w_lags=2,
+    name_x=X.drop(columns=["market_capitalization"]).columns.tolist(),
+    w=ps.lib.weights.full2W(H.to_numpy()),
+)
+
+print(kp_nn_regimes.summary)
+# CHOW TEST H0 all regimes sames
+# REGIMES DIAGNOSTICS - CHOW TEST
+#                  VARIABLE        DF        VALUE           PROB
+#                  CONSTANT         2          12.396           0.0020
+#     market_capitalization         2           7.013           0.0300
+#         price_to_earnings         2           2.658           0.2647
+#         price_to_research         2          41.856           0.0000
+#             profit_margin         2          14.707           0.0006
+#                        rm         2           4.666           0.0970
+
+# %%
+J = G.where(lambda x: x == 0, 1).apply(lambda x: x / x.sum(), axis=1)
+
+kp_nn = ps.model.spreg.GM_Combo_Het(
+    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    x=X.to_numpy(),
+    step1c=False,
+    w_lags=2,
+    name_x=X.columns.tolist(),
+    w=ps.lib.weights.full2W(J.to_numpy()),
+)
+
+print(kp_nn.summary)
