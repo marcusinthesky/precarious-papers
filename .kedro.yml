@@ -1,1 +1,6 @@
 context_path: precarious_papers.run.ProjectContext
+project_name: "precarious-papers"
+project_version: "0.16.5"
+package_name: "precarious_papers"
+hooks:
+  - precarious_papers.hooks.project_hooks

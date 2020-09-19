@@ -124,9 +124,85 @@ best_clip = minimize(best_winsor, x0=0.06, method="nelder-mead")
 
 
 # %%
+y = y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x])
 
+
+# %%
+# %%
+
+exclude = []
+for i in range(50):  # 29):
+    X_, y_, P = (
+        X.reset_index(drop=True),
+        y.reset_index(drop=True),
+        pd.DataFrame(renamed_distances.loc[F.index, F.index].to_numpy()),
+    )
+
+    # Winsorize
+    average_degree = 2.9832619059417067
+
+    distribution = stats.poisson(average_degree)
+
+    D = (
+        P.loc[X_.index, X_.index]
+        .replace(0, np.nan)
+        .subtract(1)
+        .apply(distribution.pmf)
+        .fillna(0)
+    )
+
+    try:
+        X_ = X_.drop(exclude)
+        y_ = y_.drop(exclude)
+        # G = G.drop(exclude).drop(columns=exclude)
+        D = D.drop(exclude).drop(columns=exclude)
+    except:
+        print("skipped")
+        pass
+
+    model = OLS(y_, X_.assign(alpha=1))
+    results = model.fit()
+    results.summary()
+
+    tests = sms.jarque_bera(results.resid)
+    print(tests)
+    if results.get_influence().influence.max() < 0.003:
+        break
+
+    # Prob(JB):	0.0825
+
+    excluder = (
+        pd.Series(results.get_influence().influence, index=y_.index)
+        .nlargest(1)
+        .index[0]
+    )
+    print(excluder)
+    exclude.append(excluder)
+
+
+# %%
+results.summary()
+
+# %%
+# Reject normality assumption Leptokurtic present
+fig, ax = plt.subplots(figsize=(12, 8))
+fig = sm.graphics.influence_plot(results, ax=ax, criterion="DFFITS")
+
+# %%
+pd.Series(results.get_influence().influence, index=y_.index).nlargest(5)
+
+# %%
+# G = D
+G = D.apply(lambda x: x / np.sum(x), 1)
+w = ps.lib.weights.full2W(G.to_numpy(), ids=G.index.tolist())
+
+# %%
+X, y, r = X_, y_, r.iloc[y_.index]
+
+# %%
+# %%
 ols = ps.model.spreg.OLS(
-    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    y=y.to_numpy(),
     x=X.to_numpy(),
     spat_diag=True,
     moran=True,
@@ -138,7 +214,7 @@ print(ols.summary)
 
 # %%
 ols_regime = ps.model.spreg.OLS_Regimes(
-    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    y=y.to_numpy(),
     x=X.to_numpy(),
     regimes=r.to_numpy(),
     spat_diag=True,
@@ -158,7 +234,7 @@ X_unsaturated = X.drop(columns=["market_capitalization", "profit_margin"])
 
 # %%
 sar = ps.model.spreg.GM_Lag(
-    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    y=y.to_numpy(),
     x=X_unsaturated.to_numpy(),
     spat_diag=True,
     w_lags=2,
@@ -170,7 +246,7 @@ print(sar.summary)
 
 # %%
 sar = ps.model.spreg.GM_Lag_Regimes(
-    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    y=y.to_numpy(),
     x=X_unsaturated.drop(columns=["price_to_earnings"]).to_numpy(),
     regimes=r.astype(int).astype(str).apply(lambda s: "t=" + s + "_").to_numpy(),
     name_y="r_i",
@@ -185,7 +261,7 @@ print(sar.summary)
 
 # %%
 ser = ps.model.spreg.GM_Error_Het(
-    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    y=y.to_numpy(),
     x=X_unsaturated.to_numpy(),
     step1c=True,
     name_x=X_unsaturated.columns.tolist(),
@@ -196,7 +272,7 @@ print(ser.summary)
 
 # %%
 ser_regimes = ps.model.spreg.GM_Error_Het_Regimes(
-    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    y=y.to_numpy(),
     x=X_unsaturated.drop(columns=["price_to_earnings"]).to_numpy(),
     regimes=r.astype(int).astype(str).apply(lambda s: "t=" + s + "_").to_numpy(),
     name_y="r_i",
@@ -214,7 +290,7 @@ XGX = pd.concat(
     axis=1,
 )
 sdm = ps.model.spreg.ML_Lag(
-    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    y=y.to_numpy(),
     x=XGX.to_numpy(),
     spat_diag=True,
     name_x=XGX.columns.tolist(),
@@ -225,7 +301,7 @@ print(sdm.summary)
 
 # %%
 sdm = ps.model.spreg.ML_Lag_Regimes(
-    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    y=y.to_numpy(),
     x=XGX.to_numpy(),
     regimes=r.astype(int).astype(str).apply(lambda s: "t=" + s + "_").to_numpy(),
     name_y="r_i",
@@ -239,7 +315,7 @@ print(sdm.summary)
 
 # %%
 slx_regimes = ps.model.spreg.OLS_Regimes(
-    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    y=y.to_numpy(),
     x=XGX.to_numpy(),
     regimes=r.astype(int).astype(str).apply(lambda s: "t=" + s + "_").to_numpy(),
     name_y="r_i",
@@ -255,7 +331,7 @@ print(slx_regimes.summary)
 
 # %%
 kp = ps.model.spreg.GM_Combo_Het(
-    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    y=y.to_numpy(),
     x=X.to_numpy(),
     step1c=False,
     w_lags=2,
@@ -267,7 +343,7 @@ print(kp.summary)
 
 # %%
 kp_regimes = ps.model.spreg.GM_Combo_Het_Regimes(
-    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    y=y.to_numpy(),
     x=X_unsaturated.drop(columns=["price_to_earnings"]).to_numpy(),
     regimes=r.astype(int).astype(str).apply(lambda s: "t=" + s + "_").to_numpy(),
     name_y="r_i",
@@ -291,7 +367,7 @@ H = (
 
 XGX = pd.concat([X, (G @ X).rename(columns=lambda s: s + "_exogenous"),], axis=1,)
 sdem_nn_regimes = ps.model.spreg.GM_Error_Het_Regimes(
-    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    y=y.to_numpy(),
     x=XGX.to_numpy(),
     regimes=r.astype(int).astype(str).apply(lambda s: "t=" + s + "_").to_numpy(),
     name_y="r_i",
@@ -305,7 +381,7 @@ print(sdem_nn_regimes.summary)
 
 # %%
 sdm_nn_regimes = ps.model.spreg.GM_Lag_Regimes(
-    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    y=y.to_numpy(),
     x=XGX.to_numpy(),
     regimes=r.astype(int).astype(str).apply(lambda s: "t=" + s + "_").to_numpy(),
     name_y="r_i",
@@ -321,7 +397,7 @@ print(sdm_nn_regimes.summary)
 # %%
 
 kp_nn = ps.model.spreg.GM_Combo_Het(
-    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    y=y.to_numpy(),
     x=X.to_numpy(),
     step1c=True,
     w_lags=2,
@@ -334,7 +410,7 @@ print(kp_nn.summary)
 
 # %%
 kp_regimes = ps.model.spreg.GM_Combo_Het_Regimes(
-    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    y=y.to_numpy(),
     x=X.drop(
         columns=["profit_margin", "price_to_earnings", "market_capitalization"]
     ).to_numpy(),
@@ -357,7 +433,7 @@ sms.jarque_bera(kp_regimes.e_filtered)
 
 # %%
 kp_nn_regimes = ps.model.spreg.GM_Combo_Het_Regimes(
-    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    y=y.to_numpy(),
     x=X.drop(columns=["market_capitalization"]).to_numpy(),
     regimes=r.to_numpy(),
     step1c=True,
@@ -381,7 +457,7 @@ print(kp_nn_regimes.summary)
 J = G.where(lambda x: x == 0, 1).apply(lambda x: x / x.sum(), axis=1)
 
 kp_nn = ps.model.spreg.GM_Combo_Het(
-    y=y.apply(stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]).to_numpy(),
+    y=y.to_numpy(),
     x=X.to_numpy(),
     step1c=False,
     w_lags=2,

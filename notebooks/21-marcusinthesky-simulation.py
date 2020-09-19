@@ -36,38 +36,17 @@ tqdm.pandas()
 # %%
 T = 1000
 N = 100
-W = 100
-P = 0.05
+W = 10
+P = 0.02
 
 S = 1000
 
 
 # %%
-# def graph(t=T, n=N):
-#     t +=1
-#     a = np.random.uniform(0., 1., size=(t, n, n)).cumsum(0)
-#     b = np.clip(a, 0, 1) # slip where the cum average exceeded the bounds
-#     c = np.diff(a, n=1, axis=0, prepend=np.zeros(shape=(1, n, n))) # this gives us the values in excess of the clip
-#     d = (b - c) # now it looks like it gets stuck of bounded off the bounds
-#     e = d < P
-#     return np.nan_to_num(e / e.sum(1).reshape(t, 1, n))[1:, :, :]
+def smooth(x, y, w=W):
+    return np.linspace(start=x, stop=y, num=w, axis=1)[0, ...]
 
-# %%
-# def random_renyi_matrix():
-#     return pipe(random_renyi(N, 0.1),
-#                 nx.to_numpy_matrix,
-#                 partial(np.expand_dims, axis=0))
 
-# def moving_average(x, w=10):
-#     return np.convolve(x, np.ones(w), 'valid') / w
-
-# def random_renyi(n, p):
-#     G = nx.fast_gnp_random_graph(n, p)
-#     for (u,v,w) in G.edges(data=True):
-#         w['weight'] = np.random.uniform()
-#     return G
-
-# %%
 @numba.jit
 def gaps(t=T, w=W):
     return np.diff(
@@ -77,56 +56,80 @@ def gaps(t=T, w=W):
     )
 
 
-@numba.jit
-def get_mat(n=N):
-    a = np.tril(np.random.uniform(0.0, 1.0, size=(n, n)), -1)
-    return np.expand_dims(a + a.T, 0)
+# %%
+# # rand interval, random switching
+# @numba.jit
+# def get_mat(n=N):
+#     a = np.tril(np.random.uniform(0., 1., size=(n, n)), -1)
+#     return np.expand_dims(a + a.T, 0)
+
+# @numba.jit
+# def get_thresh(n=N, p=P):
+#     a = get_mat(n)
+#     return np.where(a > (1-P), (a/2) + 0.5 , 0)
+
+# def probability(t=T, n=N):
+#     return np.concatenate([smooth(a, b, w) for (a, b), w in zip(sliding_window(2, [get_thresh(n) for _ in range(t)]), gaps(T, W))])
+
+# def graph(t=T, n=N):
+#     return np.round(probability(t, n))
+
+# %%
+# # sum assignment over distances
+# from sklearn.metrics import pairwise_distances
+# from scipy.optimize import linear_sum_assignment
+# def graph():
+#     g = np.concatenate([np.expand_dims(nx.to_numpy_array(nx.fast_gnp_random_graph(N, P)), axis=0) for _ in range(T)])
+#     d = pairwise_distances(g.reshape(T, -1), metric='cosine')
+#     e = d + np.eye(d.shape[0])
+#     row_ind, col_ind = linear_sum_assignment(e)
+#     f = g[col_ind, ...]
+
+#     return f
+
+# %%
+# sum assignment over distances, smoothed interval switching
+from scipy.optimize import linear_sum_assignment
+from sklearn.metrics import pairwise_distances
 
 
-def smooth(x, y, w=W):
-    return np.linspace(start=x, stop=y, num=w, axis=1)[0]
-
-
-def graph(t=T, n=N):
-    return (
-        np.concatenate(
-            [
-                smooth(a, b, w)
-                for (a, b), w in zip(
-                    sliding_window(2, [get_mat(n) for _ in range(t)]), gaps(T, W)
-                )
-            ]
-        )
-        < P
+def sorted_graphs(n=N, t=T, w=W, p=P):
+    tw = t // w
+    g = np.concatenate(
+        [
+            np.expand_dims(nx.to_numpy_array(nx.fast_gnp_random_graph(n, p)), axis=0)
+            for _ in range(tw)
+        ]
     )
+    d = pairwise_distances(g.reshape(tw, -1), metric="cosine")
+    e = d + np.eye(d.shape[0])
+    row_ind, col_ind = linear_sum_assignment(e)
+    f = g[col_ind, ...]
+
+    return f
+
+
+def graph():
+    a = sorted_graphs(t=T + W)
+    b = np.where(a == 1, np.random.uniform(0.5, 1), 0)
+    c = gaps()
+    d = np.concatenate(
+        [
+            smooth(a, b, w)
+            for (a, b), w in zip(
+                sliding_window(2, map(partial(np.expand_dims, axis=0), list(b))),
+                gaps(T, W),
+            )
+        ]
+    )
+
+    return d
 
 
 # %%
 # %%timeit
 graph()
 
-# %%
-# G = compose_left(nx.fast_gnp_random_graph,
-#                  nx.to_numpy_matrix,
-#                  lambda x: np.random.uniform(0, x, size=x.shape),
-#                  partial(np.expand_dims, axis=0)
-#         )
-
-# D = partial(G, n=N, p=P)
-
-# def smooth(x, y, num=W):
-#     return np.linspace(start=x, stop=y, num=num, axis=1)[0]
-
-# def graph():
-#     G_ =  pipe([D() for _ in range((T // W)+1)],
-#                  sliding_window(2),
-#                  map(lambda z: smooth(*z)),
-#                  list,
-#                  np.concatenate,
-#                  np.round)
-
-
-#     return np.nan_to_num(G_ / G_.sum(1).reshape(T, 1, N))
 
 # %%
 def sample(t=T, n=N):
@@ -178,9 +181,6 @@ samples_ = (
     .assign(ri_g=lambda df: df.progress_applymap(spatial_corr))
     .progress_applymap(pd.DataFrame)
 )
-
-# %%
-samples_
 
 # %%
 (
@@ -256,5 +256,3 @@ states_ = samples_.head(10).progress_applymap(partial(clusters, algorithm=meansh
 states_.hvplot.hist(
     title="Number of MeanShift Market States", xlabel="Count of Discovered States"
 )
-
-# %%

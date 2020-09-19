@@ -1,0 +1,8 @@
+{
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": true,
+    "python.linting.enabled": true,
+    "python.envFile": "${projectRoot}/.env",
+    "python.dataScience.jupyterServerURI": "http://127.0.0.1:8888/?token=e7a46321f5fddefe4ea46eb03554883ab5fb44e8d547bff6",
+    "python.pythonPath": "/home/marcussky/anaconda3/envs/precarious_papers/bin/python"
+}

@@ -36,6 +36,22 @@ results.summary()
 fig, ax = plt.subplots(figsize=(12, 8))
 fig = sm.graphics.influence_plot(results, ax=ax, criterion="cooks")
 
+
+def best_winsor(l):
+    print(l)
+    y_clip = features.returns.apply(stats.mstats.winsorize, limits=[l, l])
+    JB, JBpv, skew, kurtosis = sms.jarque_bera(y_clip)
+    return -JBpv.item()
+
+
+best_clip = minimize(best_winsor, x0=0.06, method="nelder-mead")
+
+features = features.assign(
+    returns=lambda df: df.returns.apply(
+        stats.mstats.winsorize, limits=[best_clip.x, best_clip.x]
+    )
+)
+
 # %%
 exclude = []
 for i in range(29):
@@ -69,7 +85,7 @@ for i in range(29):
 
     tests = sms.jarque_bera(results.resid)
     print(tests)
-    if tests[1] > 0.2:
+    if tests[1] > 0.1:
         break
 
     # Prob(JB):	0.0825
@@ -174,15 +190,78 @@ print(ols_unresticted_varying.summary)
 #        profit_margin       0.0104346       0.0121419       0.8593851       0.3918560
 #    price_to_research       0.0000052       0.0000026       2.0188798       0.0457474
 
+# %%
+
+
+# %%
+from functools import partial
+
+
+def model(d, G, fit_intercept=True):
+    if fit_intercept:
+        return OLS(d, G @ d.to_frame().assign(alpha=1)).fit()
+    else:
+        return OLS(d, G @ d.to_frame()).fit()
+
+
+models = (
+    X.apply(partial(model, G=G, fit_intercept=True), axis=0)
+    .rename("model")
+    .to_frame()
+    .assign(
+        pvalue=lambda df: df.model.apply(lambda s: s.pvalues[0]).round(3),
+        coef=lambda df: df.model.apply(lambda s: s.params[0]).round(3),
+    )
+)
+models
+
+# %%
+filtered_features = models.pvalue.where(lambda s: s > 0.01).dropna().index
+X_restricted = X.loc[:, filtered_features]
+
+
+# %%
+XGX = pd.concat(
+    [X, (G @ X_restricted).rename(columns=lambda s: s + "_exogenous"),], axis=1,
+)
+
+ml_sdm_fixed = ps.model.spreg.ML_Lag(
+    y.to_numpy(),
+    XGX.to_numpy(),
+    name_x=XGX.columns.tolist(),
+    w=ps.lib.weights.full2W(G.to_numpy(), ids=G_opt.index.tolist()),
+    spat_diag=True,
+)
+
+print(ml_sdm_fixed.summary)
+
+
+# %%
+XGX_opt = pd.concat(
+    [X, (G_opt @ X_restricted).rename(columns=lambda s: s + "_exogenous"),], axis=1,
+)
+
+ml_sdm_varying = ps.model.spreg.ML_Lag(
+    y.to_numpy(),
+    XGX.to_numpy(),
+    name_x=XGX.columns.tolist(),
+    w=ps.lib.weights.full2W(G_opt.to_numpy(), ids=G_opt.index.tolist()),
+    spat_diag=True,
+)
+
+print(ml_sdm_varying.summary)
+
 
 # %%
 # SER
-ml_ser_fixed = ps.model.spreg.ML_Error(
+ml_ser_fixed = ps.model.spreg.GM_Combo_Het(
     y.to_numpy(),
     X.to_numpy(),
+    step1c=False,
+    w_lags=2,
     name_x=X.columns.tolist(),
-    w=ps.lib.weights.full2W(G_opt.to_numpy(), ids=G_opt.index.tolist()),
-    spat_diag=True,
+    w=ps.lib.weights.full2W(G_opt.to_numpy(), ids=G.index.tolist()),
+    # spat_diag=True,
 )
 
 print(ml_ser_fixed.summary)
@@ -236,7 +315,7 @@ def opt_lam(lam):
             y.to_numpy(), X.to_numpy(), name_x=X.columns.tolist(), w=w, spat_diag=True,
         )
 
-        return model.betas[-1], model, G
+        return -model.pr2, model, G
 
     except:
         print("error")
