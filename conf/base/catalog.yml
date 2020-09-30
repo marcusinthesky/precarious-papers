@@ -106,12 +106,12 @@ paradise_distances:
   filepath: data/02_intermediate/csv_paradise_papers.2018-02-14/paradise_papers_distances.parquet
   versioned: True
 
-paradise_isomap:
-  type: precarious_papers.io.HoloviewsWriter
-  filepath: data/08_reporting/csv_paradise_papers.2018-02-14/paradise_isomap.html
-  versioned: True
-  save_args:
-    fmt: html
+# paradise_isomap:
+#   type: precarious_papers.io.HoloviewsWriter
+#   filepath: data/08_reporting/csv_paradise_papers.2018-02-14/paradise_isomap.html
+#   versioned: True
+#   save_args:
+    # fmt: html
 
 
 # Panama
@@ -216,6 +216,14 @@ iex_matched_entities:
   type: pandas.ParquetDataSet
   filepath: data/01_raw/iex_matched_symbols.csv
   versioned: True
+
+fama_french:
+  type: pandas.CSVDataSet
+  filepath: data/01_raw/F-F_Research_Data_5_Factors_2x3_daily.CSV
+  load_args:
+      skiprows: 3
+      index_col: 0
+      parse_dates: True
 
 
 # 04_features
