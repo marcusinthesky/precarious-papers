@@ -25,15 +25,23 @@
 #
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Example code for the nodes in the example pipeline. This code is meant
-just for illustrating basic Kedro features.
-
-PLEASE DELETE THIS FILE ONCE YOU START WORKING ON YOUR OWN PROJECT!
-"""
-
+import string
+import warnings
 from typing import Any, Dict
 
+import holoviews as hv
+import hvplot.pandas  # noqa
+import networkx as nx
+import numpy as np
 import pandas as pd
+from iexfinance.stocks import get_historical_data
+import requests
+from iexfinance.refdata import get_symbols
+from sklearn.metrics import pairwise_distances
+from tqdm import tqdm
+
+tqdm().pandas()
+hv.extension("bokeh")
 
 
 def split_data(data: pd.DataFrame, example_test_data_ratio: float) -> Dict[str, Any]:
@@ -76,3 +84,242 @@ def split_data(data: pd.DataFrame, example_test_data_ratio: float) -> Dict[str, 
         test_x=test_data_x,
         test_y=test_data_y,
     )
+
+
+def get_iex_symbols(secret: str) -> pd.DataFrame:
+    """
+    Calls IEXCloud API to get symbols for all securities.
+    """
+    symbols = get_symbols(output_format="pandas", token=secret["iex"])
+
+    return symbols
+
+
+def get_entities(
+    paradise_nodes_entity: pd.DataFrame,
+    paradise_nodes_intermediary: pd.DataFrame,
+    paradise_nodes_officer: pd.DataFrame,
+    paradise_nodes_other: pd.DataFrame,
+) -> pd.DataFrame:
+    """
+    Merges all entity types across files and defines index
+    """
+
+    entities = (
+        pd.concat(
+            [
+                paradise_nodes_entity,
+                paradise_nodes_intermediary,
+                paradise_nodes_officer,
+                paradise_nodes_other,
+            ],
+            axis=0,
+        )
+        .reset_index(drop=True)
+        .rename(columns={"index": "source_index"})
+    )
+
+    return entities
+
+
+def get_iex_matched_entities(
+    entities: pd.DataFrame, symbols: pd.DataFrame
+) -> pd.DataFrame:
+    """
+    Merged IEXCloud symbols and metadata with leak entities
+    """
+    iex_matched_entities = (
+        entities.assign(
+            lower_string=lambda df: df.name.str.lower().str.replace(
+                "[{}]".format(string.punctuation), ""
+            )
+        )
+        .assign(entities=lambda df: df.name)
+        .merge(
+            symbols.assign(
+                lower_string=lambda df: df.name.str.lower().str.replace(
+                    "[{}]".format(string.punctuation), ""
+                )
+            ).rename(columns={"name": "match"}),
+            on="lower_string",
+            how="inner",
+        )
+        .assign(score=100)
+    )
+
+    return iex_matched_entities
+
+
+def get_graph(paradise_edges: pd.DataFrame) -> nx.Graph:
+    """
+    Uses edge list to build graph
+    """
+    paradise_graph = nx.convert_matrix.from_pandas_edgelist(
+        df=paradise_edges,
+        source="START_ID",
+        target="END_ID",
+        edge_attr=paradise_edges.columns.drop(["START_ID", "END_ID"]).tolist(),
+    )
+
+    return paradise_graph
+
+
+def find_path_length(source: str, target: str, G: nx.Graph) -> int:
+    try:
+        return nx.shortest_path_length(G, source.item(), target.item())
+    except nx.exception.NetworkXNoPath:
+        warnings.warn("No path found")
+        return np.nan
+
+
+def compute_paradise_distances(
+    iex_matched_entities: pd.DataFrame, paradise_graph: nx.Graph
+) -> pd.DataFrame:
+    D = pairwise_distances(
+        X=(iex_matched_entities.node_id.to_numpy().reshape(-1, 1)),
+        metric=find_path_length,
+        n_jobs=-1,
+        G=paradise_graph,
+    )
+
+    paradise_distances = (
+        pd.DataFrame(
+            D, columns=iex_matched_entities.symbol, index=iex_matched_entities.symbol
+        )
+        .T.drop_duplicates()
+        .T.drop_duplicates()
+        .reset_index()
+        .groupby("symbol")
+        .min()
+        .T.reset_index()
+        .groupby("symbol")
+        .min()
+    )
+
+    return paradise_distances
+
+
+def get_balance_sheet(ticker: str, secret: str) -> Dict:
+    """
+    Makes call to iexcloud for balance sheet data
+    """
+    data_set = requests.get(
+        url=f"https://cloud.iexapis.com/stable/stock/{ticker}/balance-sheet",
+        params={"period": "annual", "last": 4, "token": secret["iex"]},
+    )
+
+    return data_set.json()
+
+
+def balancesheet_to_frame(d: Dict) -> pd.DataFrame:
+    """
+    Formats balance sheet data
+    """
+    if "balancesheet" in d.keys() and "symbol" in d.keys():
+        return pd.DataFrame(d["balancesheet"]).assign(symbol=d["symbol"])
+    else:
+        return pd.DataFrame()
+
+
+def get_income_statement(ticker, secret) -> Dict:
+    """
+    Makes call to iexcloud for income statement data
+    """
+    try:
+        data_set = requests.get(
+            url=f"https://cloud.iexapis.com/stable/stock/{ticker}/income",
+            params={"period": "annual", "last": 4, "token": secret["iex"]},
+        )
+        return data_set.json()
+    except requests.ConnectionError:
+        return {}
+
+
+def income_statement_to_frame(d: Dict) -> pd.DataFrame:
+    """
+    Formats income statement data
+    """
+    if "income" in d.keys() and "symbol" in d.keys():
+        return pd.DataFrame(d["income"]).assign(symbol=d["symbol"])
+    else:
+        return pd.DataFrame()
+
+
+def get_market_cap(ticker: str, secret: str) -> Dict:
+    """
+    Makes call to iexcloud for marketcap data
+    """
+    data_set = requests.get(
+        url=f"https://cloud.iexapis.com/stable/stock/{ticker}/stats/marketcap",
+        params={"period": "annual", "last": 4, "token": secret["iex"]},
+    )
+    return data_set.json()
+
+
+def get_factor_data(iex_matched_entities: pd.DataFrame, secret: str) -> pd.DataFrame:
+    """
+    Pulls, formats and merges firm characteristic data from IEXCloud
+    """
+    balance_sheet_data = (
+        iex_matched_entities.loc[:, ["symbol"]]
+        .drop_duplicates()
+        .assign(
+            balance_sheet=lambda df: df.symbol.apply(get_balance_sheet, secret=secret)
+        )
+    )
+
+    balancesheet = pd.concat(
+        balance_sheet_data.balance_sheet.apply(balancesheet_to_frame).tolist()
+    )
+
+    income_statement_data = (
+        iex_matched_entities.loc[:, ["symbol"]]
+        .drop_duplicates()
+        .assign(
+            income_statement=lambda df: df.symbol.apply(
+                get_income_statement, secret=secret
+            )
+        )
+    )
+
+    income_statement = pd.concat(
+        income_statement_data.income_statement.apply(income_statement_to_frame).tolist()
+    )
+
+    market_cap_data = (
+        iex_matched_entities.loc[:, ["symbol"]]
+        .drop_duplicates()
+        .assign(market_cap=lambda df: df.symbol.apply(get_market_cap, secret=secret))
+    )
+
+    return balancesheet, income_statement, market_cap_data
+
+
+def get_price_data(
+    iex_matched_entities: pd.DataFrame, release: Dict, window: Dict, secret: str
+) -> pd.DataFrame:
+    release = pd.to_datetime(release["paradise_papers"])
+
+    start = (release + pd.tseries.offsets.BDay(window["start"])).to_pydatetime()
+
+    end = (release + pd.tseries.offsets.BDay(window["end"])).to_pydatetime()
+
+    unique_tickers = iex_matched_entities.symbol.drop_duplicates().tolist()
+
+    historical_prices = []
+    chunks = np.array_split(unique_tickers, (len(unique_tickers)) // 100 + 1)
+    for c in chunks:
+        historical_prices.append(
+            get_historical_data(
+                symbols=c.tolist(),
+                start=start,
+                end=end,
+                close_only=True,
+                token=secret,
+                output_format="pandas",
+            )
+        )
+
+    paradise_price = pd.concat(historical_prices, axis=1)
+
+    return paradise_price
