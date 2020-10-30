@@ -458,10 +458,10 @@ def get_basis(
         ]
     )
 
-    X, y, W = (
-        features.drop(columns=["returns"]),
+    X, y, D = (
+        features.drop(columns=["returns", "alpha"]),
         features.returns.to_frame(),
         renamed_distances.loc[features.index, features.index],
     )
 
-    return X, y, W
+    return X, y, D

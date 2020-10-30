@@ -91,7 +91,7 @@ def create_pipeline(**kwargs):
                     distances="paradise_distances",
                     release="params:release",
                 ),
-                ["X", "y", "W"],
+                ["X", "y", "D"],
                 tags=["basis"],
             ),
         ]

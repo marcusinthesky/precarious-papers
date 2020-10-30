@@ -128,15 +128,20 @@ iex_matched_entities:
 
 X:
   type: pandas.ParquetDataSet
-  filepath: data/01_raw/X.parquet
+  filepath: data/03_features/X.parquet
   versioned: True
 
 y:
   type: pandas.ParquetDataSet
-  filepath: data/01_raw/y.parquet
+  filepath: data/03_features/y.parquet
   versioned: True
 
-W:
+D:
   type: pandas.ParquetDataSet
-  filepath: data/01_raw/W.parquet
+  filepath: data/03_features/W.parquet
+  versioned: True
+
+nonspatialresults:
+  type: pandas.CSVDataSet
+  filepath: data/07_model_output
   versioned: True

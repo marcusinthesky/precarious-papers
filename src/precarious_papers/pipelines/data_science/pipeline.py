@@ -32,8 +32,18 @@ just for illustrating basic Kedro features.
 Delete this when you start working on your own Kedro project.
 """
 
-from kedro.pipeline import Pipeline
+from kedro.pipeline import Pipeline, node
+from .nodes import get_non_spatial_results
 
 
 def create_pipeline(**kwargs):
-    return Pipeline([])
+    return Pipeline(
+        [
+            node(
+                get_non_spatial_results,
+                ["X", "y", "D"],
+                "nonspatialresults",
+                tags="nonspatialmodel",
+            )
+        ]
+    )
