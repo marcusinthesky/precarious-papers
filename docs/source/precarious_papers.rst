@@ -11,7 +11,6 @@ Subpackages
 
 .. toctree::
 
-    precarious_papers.io
     precarious_papers.nodes
     precarious_papers.pipelines
 
