@@ -112,20 +112,31 @@ market_cap:
 
 # IEX Symbols
 symbols:
-  type: pandas.CSVDataSet
-  filepath: data/01_raw/iex_symbols.csv
+  type: pandas.ParquetDataSet
+  filepath: data/01_raw/iex_symbols.parquet
   versioned: True
-  save_args:
-    index: False
 
 entities:
-  type: pandas.CSVDataSet
-  filepath: data/01_raw/entities.csv
+  type: pandas.ParquetDataSet
+  filepath: data/01_raw/entities.parquet
   versioned: True
-  save_args:
-    index: False
 
 iex_matched_entities:
   type: pandas.ParquetDataSet
-  filepath: data/01_raw/iex_matched_symbols.csv
+  filepath: data/01_raw/iex_matched_symbols.parquet
+  versioned: True
+
+X:
+  type: pandas.ParquetDataSet
+  filepath: data/01_raw/X.parquet
+  versioned: True
+
+y:
+  type: pandas.ParquetDataSet
+  filepath: data/01_raw/y.parquet
+  versioned: True
+
+W:
+  type: pandas.ParquetDataSet
+  filepath: data/01_raw/W.parquet
   versioned: True

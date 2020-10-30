@@ -323,3 +323,145 @@ def get_price_data(
     paradise_price = pd.concat(historical_prices, axis=1)
 
     return paradise_price
+
+
+def get_basis(
+    matched: pd.DataFrame,
+    indices: pd.DataFrame,
+    price: pd.DataFrame,
+    balancesheet: pd.DataFrame,
+    income: pd.DataFrame,
+    distances: pd.DataFrame,
+    release: str,
+) -> pd.DataFrame:
+    """
+    Constructs the Basis matrix and pairwise distance matrix for our experiments
+
+    """
+    index = (
+        matched.groupby("symbol")
+        .apply(lambda df: df.sample(1))
+        .set_index("symbol")
+        .exchange
+    )
+
+    rf = ((1 + 3.18e-05) ** 5) - 1
+
+    rm_rates = (
+        index.rename("index")
+        .to_frame()
+        .merge(
+            indices.pct_change()
+            .add(1)
+            .cumprod()
+            .tail(1)
+            .subtract(1)
+            .T.rename(columns=lambda x: "rm"),
+            left_on="index",
+            right_index=True,
+        )
+        .rm.subtract(rf)
+    )
+
+    returns = (
+        price.loc[:, pd.IndexSlice[:, "close"]]
+        .pct_change()
+        .add(1)
+        .cumprod()
+        .tail(1)
+        .subtract(1)
+        .subtract(rf)
+    )
+
+    returns.columns = returns.columns.droplevel(1)
+    returns = returns.T.rename(columns=lambda x: "returns").dropna()
+
+    returns = returns.assign(
+        excess=returns.returns.subtract(rm_rates).dropna(), rm=rm_rates
+    ).dropna()
+
+    # remove islands
+    inner_index = returns.join(
+        (
+            distances.where(lambda df: df.sum() > 0)
+            .dropna(how="all")
+            .T.where(lambda df: df.sum() > 0)
+            .dropna(how="all")
+        ),
+        how="inner",
+    ).index
+
+    renamed_distances = distances.loc[inner_index, inner_index]
+    returns = returns.loc[inner_index, :]
+
+    communities = (
+        pd.get_dummies(
+            renamed_distances.where(
+                lambda df: df.isna(), lambda df: df.apply(lambda x: x.index)
+            )
+            .fillna("")
+            .apply(lambda df: hash(df.str.cat()))
+        )
+        .T.reset_index(drop=True)
+        .T
+    )
+    communities = communities.loc[:, communities.sum() > 1]
+
+    factors = pd.merge_asof(
+        returns.reset_index()
+        .rename(columns={"index": "symbol"})
+        .assign(reportDate=pd.to_datetime(release["paradise_papers"]))
+        .sort_values("reportDate"),
+        balancesheet.merge(
+            income.drop(columns=["minorityInterest", "fiscalDate", "currency"]),
+            on=["reportDate", "symbol"],
+        )
+        .assign(reportDate=lambda df: pd.to_datetime(df.reportDate))
+        .sort_values("reportDate"),
+        on="reportDate",
+        by="symbol",
+        direction="backward",
+    )
+
+    average_price = (
+        price.loc[:, pd.IndexSlice[:, "close"]]
+        .mean()
+        .reset_index()
+        .rename(columns={"level_0": "symbol", 0: "price"})
+        .set_index("symbol")
+        .price
+    )
+    features = (
+        factors.set_index("symbol")
+        .fillna(factors.mean())
+        .assign(alpha=1)
+        .select_dtypes(include="number")
+        .join(average_price)
+        .assign(
+            price_to_earnings=lambda df: df.price / (df.totalAssets / df.commonStock),
+            market_capitalization=lambda df: df.price * df.commonStock,
+            profit_margin=lambda df: df.grossProfit / df.totalRevenue,
+            price_to_research=lambda df: (df.price * df.commonStock)
+            / df.researchAndDevelopment,
+        )
+        .loc[
+            :,
+            [
+                "rm",
+                "price_to_earnings",
+                "market_capitalization",
+                "profit_margin",
+                "price_to_research",
+                "alpha",
+                "returns",
+            ],
+        ]
+    )
+
+    X, y, W = (
+        features.drop(columns=["returns"]),
+        features.returns.to_frame(),
+        renamed_distances.loc[features.index, features.index],
+    )
+
+    return X, y, W

@@ -36,6 +36,7 @@ from .nodes import (
     compute_paradise_distances,
     get_iex_matched_entities,
     get_price_data,
+    get_basis,
 )
 
 
@@ -58,7 +59,7 @@ def create_pipeline(**kwargs):
                 get_iex_matched_entities,
                 ["entities", "symbols"],
                 "iex_matched_entities",
-                tags=["iex_matched_entities"],
+                tags=["matched"],
             ),
             node(
                 get_factor_data,
@@ -78,6 +79,20 @@ def create_pipeline(**kwargs):
                 ["iex_matched_entities", "params:release", "params:window", "secret"],
                 "paradise_price",
                 tags=["price"],
+            ),
+            node(
+                get_basis,
+                dict(
+                    matched="iex_matched_entities",
+                    indices="indices",
+                    price="paradise_price",
+                    balancesheet="balance_sheet",
+                    income="income_statement",
+                    distances="paradise_distances",
+                    release="params:release",
+                ),
+                ["X", "y", "W"],
+                tags=["basis"],
             ),
         ]
     )
