@@ -27,7 +27,8 @@
 # limitations under the License.
 import string
 import warnings
-from typing import Any, Dict
+import json
+from typing import Dict
 
 import holoviews as hv
 import hvplot.pandas  # noqa
@@ -39,58 +40,19 @@ import requests
 from iexfinance.refdata import get_symbols
 from sklearn.metrics import pairwise_distances
 from tqdm import tqdm
+from scipy.stats.mstats import winsorize
+
 
 tqdm().pandas()
 hv.extension("bokeh")
-
-
-def split_data(data: pd.DataFrame, example_test_data_ratio: float) -> Dict[str, Any]:
-    """Node for splitting the classical Iris data set into training and test
-    sets, each split into features and labels.
-    The split ratio parameter is taken from conf/project/parameters.yml.
-    The data and the parameters will be loaded and provided to your function
-    automatically when the pipeline is executed and it is time to run this node.
-    """
-    data.columns = [
-        "sepal_length",
-        "sepal_width",
-        "petal_length",
-        "petal_width",
-        "target",
-    ]
-    classes = sorted(data["target"].unique())
-    # One-hot encoding for the target variable
-    data = pd.get_dummies(data, columns=["target"], prefix="", prefix_sep="")
-
-    # Shuffle all the data
-    data = data.sample(frac=1).reset_index(drop=True)
-
-    # Split to training and testing data
-    n = data.shape[0]
-    n_test = int(n * example_test_data_ratio)
-    training_data = data.iloc[n_test:, :].reset_index(drop=True)
-    test_data = data.iloc[:n_test, :].reset_index(drop=True)
-
-    # Split the data to features and labels
-    train_data_x = training_data.loc[:, "sepal_length":"petal_width"]
-    train_data_y = training_data[classes]
-    test_data_x = test_data.loc[:, "sepal_length":"petal_width"]
-    test_data_y = test_data[classes]
-
-    # When returning many variables, it is a good practice to give them names:
-    return dict(
-        train_x=train_data_x,
-        train_y=train_data_y,
-        test_x=test_data_x,
-        test_y=test_data_y,
-    )
 
 
 def get_iex_symbols(secret: str) -> pd.DataFrame:
     """
     Calls IEXCloud API to get symbols for all securities.
     """
-    symbols = get_symbols(output_format="pandas", token=secret["iex"])
+    token = secret["iex"]
+    symbols = get_symbols(output_format="pandas", token=token)
 
     return symbols
 
@@ -199,16 +161,19 @@ def compute_paradise_distances(
     return paradise_distances
 
 
-def get_balance_sheet(ticker: str, secret: str) -> Dict:
+def get_balance_sheet(ticker: str, token: str) -> Dict:
     """
     Makes call to iexcloud for balance sheet data
     """
-    data_set = requests.get(
-        url=f"https://cloud.iexapis.com/stable/stock/{ticker}/balance-sheet",
-        params={"period": "annual", "last": 4, "token": secret["iex"]},
-    )
+    try:
+        data_set = requests.get(
+            url=f"https://cloud.iexapis.com/stable/stock/{ticker}/balance-sheet",
+            params={"period": "annual", "last": 4, "token": token},
+        )
+        return data_set.json()
 
-    return data_set.json()
+    except requests.ConnectionError or json.decoder.JSONDecodeError:
+        return {}
 
 
 def balancesheet_to_frame(d: Dict) -> pd.DataFrame:
@@ -221,17 +186,17 @@ def balancesheet_to_frame(d: Dict) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def get_income_statement(ticker, secret) -> Dict:
+def get_income_statement(ticker, token) -> Dict:
     """
     Makes call to iexcloud for income statement data
     """
     try:
         data_set = requests.get(
             url=f"https://cloud.iexapis.com/stable/stock/{ticker}/income",
-            params={"period": "annual", "last": 4, "token": secret["iex"]},
+            params={"period": "annual", "last": 4, "token": token},
         )
         return data_set.json()
-    except requests.ConnectionError:
+    except requests.ConnectionError or json.decoder.JSONDecodeError:
         return {}
 
 
@@ -245,26 +210,31 @@ def income_statement_to_frame(d: Dict) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def get_market_cap(ticker: str, secret: str) -> Dict:
+def get_market_cap(ticker: str, token: str) -> Dict:
     """
     Makes call to iexcloud for marketcap data
     """
-    data_set = requests.get(
-        url=f"https://cloud.iexapis.com/stable/stock/{ticker}/stats/marketcap",
-        params={"period": "annual", "last": 4, "token": secret["iex"]},
-    )
-    return data_set.json()
+    try:
+        data_set = requests.get(
+            url=f"https://cloud.iexapis.com/stable/stock/{ticker}/stats/marketcap",
+            params={"period": "annual", "last": 4, "token": token},
+        )
+        return data_set.json()
+
+    except requests.ConnectionError or json.decoder.JSONDecodeError:
+        return {}
 
 
-def get_factor_data(iex_matched_entities: pd.DataFrame, secret: str) -> pd.DataFrame:
+def get_factor_data(iex_matched_entities: pd.DataFrame, token: str) -> pd.DataFrame:
     """
     Pulls, formats and merges firm characteristic data from IEXCloud
     """
+
     balance_sheet_data = (
         iex_matched_entities.loc[:, ["symbol"]]
         .drop_duplicates()
         .assign(
-            balance_sheet=lambda df: df.symbol.apply(get_balance_sheet, secret=secret)
+            balance_sheet=lambda df: df.symbol.apply(get_balance_sheet, token=token)
         )
     )
 
@@ -277,7 +247,7 @@ def get_factor_data(iex_matched_entities: pd.DataFrame, secret: str) -> pd.DataF
         .drop_duplicates()
         .assign(
             income_statement=lambda df: df.symbol.apply(
-                get_income_statement, secret=secret
+                get_income_statement, token=token
             )
         )
     )
@@ -289,7 +259,7 @@ def get_factor_data(iex_matched_entities: pd.DataFrame, secret: str) -> pd.DataF
     market_cap_data = (
         iex_matched_entities.loc[:, ["symbol"]]
         .drop_duplicates()
-        .assign(market_cap=lambda df: df.symbol.apply(get_market_cap, secret=secret))
+        .assign(market_cap=lambda df: df.symbol.apply(get_market_cap, token=token))
     )
 
     return balancesheet, income_statement, market_cap_data
@@ -298,6 +268,7 @@ def get_factor_data(iex_matched_entities: pd.DataFrame, secret: str) -> pd.DataF
 def get_price_data(
     iex_matched_entities: pd.DataFrame, release: Dict, window: Dict, secret: str
 ) -> pd.DataFrame:
+    token = secret["iex"]
     release = pd.to_datetime(release["paradise_papers"])
 
     start = (release + pd.tseries.offsets.BDay(window["start"])).to_pydatetime()
@@ -315,7 +286,7 @@ def get_price_data(
                 start=start,
                 end=end,
                 close_only=True,
-                token=secret,
+                token=token,
                 output_format="pandas",
             )
         )
@@ -460,7 +431,9 @@ def get_basis(
 
     X, y, D = (
         features.drop(columns=["returns", "alpha"]),
-        features.returns.to_frame(),
+        features.returns.to_frame().apply(
+            winsorize, limits=[0.028 - 0.0, 0.062 + 0.02]
+        ),
         renamed_distances.loc[features.index, features.index],
     )
 

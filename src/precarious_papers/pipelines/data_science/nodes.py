@@ -33,13 +33,55 @@ from scipy import stats
 import pysal as ps
 
 
+def get_spatial_statistics(spatial_model: ps.model.spreg.ols.OLS) -> pd.Series:
+    statistics = pd.Series(
+        {
+            "F-statistic": "{} ({})".format(
+                round(spatial_model.f_stat[0], 3), round(spatial_model.f_stat[1], 3)
+            ),
+            "Jarque-Bera": "{} ({})".format(
+                round(spatial_model.jarque_bera["jb"], 3),
+                round(spatial_model.jarque_bera["pvalue"], 3),
+            ),
+            "Breusch-Pagan": "{} ({})".format(
+                round(spatial_model.breusch_pagan["bp"], 3),
+                round(spatial_model.breusch_pagan["pvalue"], 3),
+            ),
+            "Koenker-Basset": "{} ({})".format(
+                round(spatial_model.koenker_bassett["kb"], 3),
+                round(spatial_model.koenker_bassett["pvalue"], 3),
+            ),
+            "White": "{} ({})".format(
+                round(spatial_model.white["wh"], 3),
+                round(spatial_model.white["pvalue"], 3),
+            ),
+            "Moran’s I (error)": "{} ({})".format(
+                round(spatial_model.moran_res[-2], 3),
+                round(spatial_model.moran_res[-1], 3),
+            ),
+            "Robust LM (lag)": "{} ({})".format(
+                round(spatial_model.rlm_error[-2], 3),
+                round(spatial_model.rlm_error[-1], 3),
+            ),
+            "Robust LM (error)": "{} ({})".format(
+                round(spatial_model.rlm_lag[-2], 3), round(spatial_model.rlm_lag[-1], 3)
+            ),
+        }
+    )
+
+    return statistics
+
+
 def backwards_selection(
-    X: pd.DataFrame, y: pd.DataFrame, w: ps.lib.weights.weights.W
+    X: pd.DataFrame, y: pd.DataFrame, W: pd.DataFrame
 ) -> pd.DataFrame:
     """
     Formulate model estimates as tabular results
     """
-    results = []
+    w = ps.lib.weights.full2W(W.to_numpy())
+
+    coefficients = []
+    statistics = []
     for i in range(X.shape[1]):
 
         spatial_model = ps.model.spreg.OLS(
@@ -56,11 +98,12 @@ def backwards_selection(
             name_x=X.columns.tolist(),
         )
 
-        results.append(
+        coefficients.append(
             pd.DataFrame(
                 {
                     i: [
-                        f"{round(c, 3)} ({round(p, 3)})"
+                        f"{np.format_float_scientific(c, precision=3, exp_digits=2)}\
+                            ({round(p, 3)})"
                         for c, p in zip(
                             spatial_model.betas.flatten(),
                             np.array(spatial_model.t_stat)[:, 1],
@@ -71,17 +114,27 @@ def backwards_selection(
             )
         )
 
-        arg_least_significant = np.array(spatial_model.t_stat)[1::, 1].argmax()
-        least_significant = spatial_model.name_x[1:][arg_least_significant]
+        statistics.append(get_spatial_statistics(spatial_model).to_frame(i))
+
+        significances = np.array(spatial_model.t_stat)[2:, 1]
+
+        if len(significances) > 0:
+            arg_least_significant = significances.argmax()
+            least_significant = spatial_model.name_x[2:][arg_least_significant]
+        else:
+            least_significant = spatial_model.name_x[1]
 
         X = X.drop(columns=[least_significant])
 
-    r = pd.concat(results, axis=1).fillna("")
+    c = pd.concat(coefficients, axis=1).fillna("")
+    c = c.loc[c.eq("").sum(1).sort_values(ascending=False).index, :]
 
-    return r.loc[r.isna().sum(1).sort_values(ascending=False).index, :]
+    s = pd.concat(statistics, axis=1).fillna("")
+
+    return pd.concat([c, s])
 
 
-def get_non_spatial_results(
+def get_spatial_weights(
     X: pd.DataFrame, y: pd.DataFrame, D: pd.DataFrame
 ) -> pd.DataFrame:
     """
@@ -114,6 +167,18 @@ def get_non_spatial_results(
     assert (W.columns == y.index).all()
     assert W.var().nunique() > 1
 
-    w = ps.lib.weights.full2W(W.to_numpy())
+    return W
 
-    return backwards_selection(X, y, w)
+
+def get_slx_basis(
+    X: pd.DataFrame,
+    W: pd.DataFrame,
+    drop_features: list = [
+        "price_to_earnings",
+        "market_capitalization",
+    ],
+) -> pd.DataFrame:
+    Z = X.drop(columns=drop_features).pipe(
+        lambda df: df.join((W @ df).rename(columns=lambda s: "W_" + s))
+    )
+    return Z

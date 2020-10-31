@@ -76,7 +76,7 @@ def create_pipeline(**kwargs):
             ),
             node(
                 get_price_data,
-                ["iex_matched_entities", "params:release", "params:window", "secret"],
+                ["iex_matched_entities", "params:release", "params:window", "secrets"],
                 "paradise_price",
                 tags=["price"],
             ),

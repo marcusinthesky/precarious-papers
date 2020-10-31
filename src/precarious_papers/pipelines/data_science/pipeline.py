@@ -33,17 +33,35 @@ Delete this when you start working on your own Kedro project.
 """
 
 from kedro.pipeline import Pipeline, node
-from .nodes import get_non_spatial_results
+from .nodes import get_spatial_weights, get_slx_basis, backwards_selection
 
 
 def create_pipeline(**kwargs):
     return Pipeline(
         [
             node(
-                get_non_spatial_results,
+                get_spatial_weights,
+                "D",
+                "W",
+                tags="spatialweights",
+            ),
+            node(
+                backwards_selection,
                 ["X", "y", "D"],
                 "nonspatialresults",
                 tags="nonspatialmodel",
-            )
+            ),
+            node(
+                get_slx_basis,
+                ["X", "D", "params:drop_features"],
+                "WX",
+                tags="slx",
+            ),
+            node(
+                backwards_selection,
+                ["WX", "y", "D"],
+                "spatialresults",
+                tags="spatialmodel",
+            ),
         ]
     )

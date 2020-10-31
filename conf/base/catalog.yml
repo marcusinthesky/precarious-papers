@@ -141,7 +141,22 @@ D:
   filepath: data/03_features/W.parquet
   versioned: True
 
+W:
+  type: pandas.ParquetDataSet
+  filepath: data/03_features/W.parquet
+  versioned: True
+
+WX:
+  type: pandas.ParquetDataSet
+  filepath: data/03_features/W.parquet
+  versioned: True
+
 nonspatialresults:
+  type: pandas.CSVDataSet
+  filepath: data/07_model_output
+  versioned: True
+
+spatialresults:
   type: pandas.CSVDataSet
   filepath: data/07_model_output
   versioned: True
