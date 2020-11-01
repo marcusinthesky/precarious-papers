@@ -5,3 +5,6 @@ services:
         build:
             context: .
             dockerfile: ./compose/python/Dockerfile.yml
+
+        volumes:
+            - .:/app

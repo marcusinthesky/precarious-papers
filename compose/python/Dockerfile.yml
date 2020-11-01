@@ -6,9 +6,9 @@ conda install -y -c conda-forge mamba && \
 mamba install -y cmake compilers pybind11 libsolv libarchive libcurl nlohmann_json pip cpp-filesystem yaml-cpp -c conda-forge
 
 # install dependencies
-COPY src/environment.yml .
-RUN mamba install -y --file environment.yml
+COPY src/conda.yml src/requirements.txt src/
+RUN mamba install -y --file src/conda.yml && \
+pip install -r src/requirements.txt
 
-# copy project
-COPY . .
-CMD [ "kedro", "run" ]
+# run project pipeline from local files
+CMD kedro run --tag=local --parallel

@@ -46,7 +46,7 @@ secrets:
 # Paradise papers
 ## raw
 paradise_edges:
-  type: kedro.contrib.io.cached.CachedDataSet
+  type: CachedDataSet
   versioned: true
   dataset:
     type: pandas.CSVDataSet
@@ -72,6 +72,15 @@ paradise_nodes_other:
   type: pandas.CSVDataSet
   filepath: data/01_raw/csv_paradise_papers.2018-02-14/paradise_papers.nodes.other.csv
 
+indices:
+  type: pandas.CSVDataSet
+  filepath: data/01_raw/exchange_prices.csv
+  load_args:
+    parse_dates:
+      - Date
+    index_col:
+      - Date
+
 ## intermediate
 paradise_price:
   type: pandas.ParquetDataSet
@@ -79,35 +88,26 @@ paradise_price:
   versioned: True
 
 paradise_graph:
-  type: kedro.contrib.io.cached.CachedDataSet
+  type: CachedDataSet
   versioned: true
   dataset:
     type: networkx.NetworkXDataSet
     filepath: data/02_intermediate/paradise_papers_graph.json
 
-indices:
-  type: kedro.contrib.io.cached.CachedDataSet
-  versioned: true
-  dataset:
-    type: pandas.CSVDataSet
-    filepath: data/02_intermediate/exchange_prices.csv
-    load_args:
-      parse_dates:
-        - Date
-      index_col:
-        - Date
-
 balance_sheet:
   type: pandas.ParquetDataSet
   filepath: data/02_intermediate/balance_sheet.parquet
+  versioned: True
 
 income_statement:
   type: pandas.ParquetDataSet
   filepath: data/02_intermediate/income_statement.parquet
+  versioned: True
 
 market_cap:
   type: pandas.ParquetDataSet
   filepath: data/02_intermediate/market_cap.parquet
+  versioned: True
 
 # IEX Symbols
 symbols:

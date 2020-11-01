@@ -223,7 +223,7 @@ def get_market_cap(ticker: str, token: str) -> Dict:
         return data_set.json()
 
     except requests.ConnectionError or json.decoder.JSONDecodeError:
-        return np.nan
+        return {}
 
 
 def get_factor_data(iex_matched_entities: pd.DataFrame, secrets: Dict) -> pd.DataFrame:
@@ -283,10 +283,6 @@ def get_price_data(
 
     unique_tickers: List = iex_matched_entities.symbol.drop_duplicates().tolist()
 
-    import ipdb
-
-    ipdb.set_trace()
-
     historical_prices: List = []
     chunks = np.array_split(unique_tickers, (len(unique_tickers)) // 100 + 1)
     for c in chunks:
@@ -339,6 +335,27 @@ def get_basis(
     Constructs the Basis matrix and pairwise distance matrix for our experiments
 
     """
+
+    intersecting_index = pd.DataFrame(
+        {
+            "symbol": list(
+                set(matched.symbol)
+                .intersection(set(price.columns.droplevel(1)))
+                .intersection(set(balancesheet.symbol))
+                .intersection(set(income.symbol))
+                .intersection(set(centrality.index))
+                .intersection(set(distances.index))
+            )
+        }
+    )
+
+    matched = matched.merge(intersecting_index, how="inner", on="symbol")
+    price = price.loc[:, pd.IndexSlice[intersecting_index.symbol, :]]
+    balancesheet = balancesheet.merge(intersecting_index, how="inner", on="symbol")
+    income = income.merge(intersecting_index, how="inner", on="symbol")
+    centrality = centrality.loc[intersecting_index.symbol, :]
+    distances = distances.loc[intersecting_index.symbol, intersecting_index.symbol]
+
     index = (
         matched.groupby("symbol")
         .apply(lambda df: df.sample(1))
@@ -416,7 +433,7 @@ def get_basis(
         balancesheet.merge(
             income.pipe(
                 lambda df: df.drop(
-                    [
+                    columns=[
                         h
                         for h in df.columns
                         if h in ["minorityInterest", "fiscalDate", "currency"]
@@ -468,6 +485,7 @@ def get_basis(
         .join(centrality)
     )
 
+    # check intersection
     i: Set = set(features.index).intersection(set(renamed_distances.index))
 
     X: pd.DataFrame = features.loc[i, :].drop(columns=["returns", "alpha"])
