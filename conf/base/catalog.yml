@@ -132,6 +132,11 @@ feature:
   filepath: data/04_features/feature.parquet
   versioned: True
 
+centrality:
+  type: pandas.ParquetDataSet
+  filepath: data/04_features/centrality.parquet
+  versioned: True
+
 X:
   type: pandas.ParquetDataSet
   filepath: data/05_model_input/X.parquet

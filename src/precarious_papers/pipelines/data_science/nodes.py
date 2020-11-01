@@ -26,6 +26,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # pylint: disable=invalid-name
+from typing import List
 
 import numpy as np
 import pandas as pd
@@ -34,7 +35,7 @@ import pysal as ps
 
 
 def get_spatial_statistics(spatial_model: ps.model.spreg.ols.OLS) -> pd.Series:
-    statistics = pd.Series(
+    statistics: pd.Series = pd.Series(
         {
             "F-statistic": "{} ({})".format(
                 round(spatial_model.f_stat[0], 3), round(spatial_model.f_stat[1], 3)
@@ -78,13 +79,13 @@ def backwards_selection(
     """
     Formulate model estimates as tabular results
     """
-    w = ps.lib.weights.full2W(W.to_numpy())
+    w: ps.lib.weights.weights.W = ps.lib.weights.full2W(W.to_numpy())
 
-    coefficients = []
-    statistics = []
+    coefficients: List = []
+    statistics: List = []
     for i in range(X.shape[1]):
 
-        spatial_model = ps.model.spreg.OLS(
+        spatial_model: ps.model.spreg.ols.OLS = ps.model.spreg.OLS(
             y.to_numpy(),
             X.to_numpy(),
             w=w,
@@ -116,7 +117,7 @@ def backwards_selection(
 
         statistics.append(get_spatial_statistics(spatial_model).to_frame(i))
 
-        significances = np.array(spatial_model.t_stat)[2:, 1]
+        significances: np.ndarray = np.array(spatial_model.t_stat)[2:, 1]
 
         if len(significances) > 0:
             arg_least_significant = significances.argmax()
@@ -126,10 +127,10 @@ def backwards_selection(
 
         X = X.drop(columns=[least_significant])
 
-    c = pd.concat(coefficients, axis=1).fillna("")
-    c = c.loc[c.eq("").sum(1).sort_values(ascending=False).index, :]
+    c: pd.DataFrame = pd.concat(coefficients, axis=1).fillna("")
+    c: pd.DataFrame = c.loc[c.eq("").sum(1).sort_values(ascending=False).index, :]
 
-    s = pd.concat(statistics, axis=1).fillna("")
+    s: pd.DataFrame = pd.concat(statistics, axis=1).fillna("")
 
     return pd.concat([c, s]).reset_index().rename(columns={"index": "Estimate"})
 
@@ -141,7 +142,7 @@ def get_spatial_weights(
     estimate weighting matrix and estimate
     """
     # weibull
-    W = (
+    W: pd.DataFrame = (
         D.loc[y.index, y.index]
         .replace(0, np.nan)
         .pipe(
@@ -173,12 +174,9 @@ def get_spatial_weights(
 def get_slx_basis(
     X: pd.DataFrame,
     W: pd.DataFrame,
-    drop_features: list = [
-        "price_to_earnings",
-        "market_capitalization",
-    ],
+    drop_features: List = ["price_to_earnings", "market_capitalization", "centrality"],
 ) -> pd.DataFrame:
-    Z = X.drop(columns=drop_features).pipe(
+    Z: pd.DataFrame = X.drop(columns=drop_features).pipe(
         lambda df: df.join((W @ df).rename(columns=lambda s: "W_" + s))
     )
     return Z

@@ -19,3 +19,4 @@ window:
 drop_features:
     - price_to_earnings
     - market_capitalization
+    - centrality

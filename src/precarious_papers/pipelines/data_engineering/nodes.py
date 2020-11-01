@@ -28,7 +28,7 @@
 import string
 import warnings
 import json
-from typing import Dict
+from typing import Dict, List, Set, Tuple
 
 import holoviews as hv
 import hvplot.pandas  # noqa
@@ -51,8 +51,8 @@ def get_iex_symbols(secret: str) -> pd.DataFrame:
     """
     Calls IEXCloud API to get symbols for all securities.
     """
-    token = secret["iex"]
-    symbols = get_symbols(output_format="pandas", token=token)
+    token: str = secret["iex"]
+    symbols: pd.DataFrame = get_symbols(output_format="pandas", token=token)
 
     return symbols
 
@@ -67,7 +67,7 @@ def get_entities(
     Merges all entity types across files and defines index
     """
 
-    entities = (
+    entities: pd.DataFrame = (
         pd.concat(
             [
                 paradise_nodes_entity,
@@ -90,7 +90,7 @@ def get_iex_matched_entities(
     """
     Merged IEXCloud symbols and metadata with leak entities
     """
-    iex_matched_entities = (
+    iex_matched_entities: pd.DataFrame = (
         entities.assign(
             lower_string=lambda df: df.name.str.lower().str.replace(
                 "[{}]".format(string.punctuation), ""
@@ -116,7 +116,7 @@ def get_graph(paradise_edges: pd.DataFrame) -> nx.Graph:
     """
     Uses edge list to build graph
     """
-    paradise_graph = nx.convert_matrix.from_pandas_edgelist(
+    paradise_graph: nx.Graph = nx.convert_matrix.from_pandas_edgelist(
         df=paradise_edges,
         source="START_ID",
         target="END_ID",
@@ -137,14 +137,14 @@ def find_path_length(source: str, target: str, G: nx.Graph) -> int:
 def compute_paradise_distances(
     iex_matched_entities: pd.DataFrame, paradise_graph: nx.Graph
 ) -> pd.DataFrame:
-    D = pairwise_distances(
+    D: np.ndarray = pairwise_distances(
         X=(iex_matched_entities.node_id.to_numpy().reshape(-1, 1)),
         metric=find_path_length,
         n_jobs=-1,
         G=paradise_graph,
     )
 
-    paradise_distances = (
+    paradise_distances: pd.DataFrame = (
         pd.DataFrame(
             D, columns=iex_matched_entities.symbol, index=iex_matched_entities.symbol
         )
@@ -166,7 +166,7 @@ def get_balance_sheet(ticker: str, token: str) -> Dict:
     Makes call to iexcloud for balance sheet data
     """
     try:
-        data_set = requests.get(
+        data_set: requests.Response = requests.get(
             url=f"https://cloud.iexapis.com/stable/stock/{ticker}/balance-sheet",
             params={"period": "annual", "last": 4, "token": token},
         )
@@ -191,7 +191,7 @@ def get_income_statement(ticker, token) -> Dict:
     Makes call to iexcloud for income statement data
     """
     try:
-        data_set = requests.get(
+        data_set: requests.Response = requests.get(
             url=f"https://cloud.iexapis.com/stable/stock/{ticker}/income",
             params={"period": "annual", "last": 4, "token": token},
         )
@@ -215,7 +215,7 @@ def get_market_cap(ticker: str, token: str) -> Dict:
     Makes call to iexcloud for marketcap data
     """
     try:
-        data_set = requests.get(
+        data_set: requests.Response = requests.get(
             url=f"https://cloud.iexapis.com/stable/stock/{ticker}/stats/marketcap",
             params={"period": "annual", "last": 4, "token": token},
         )
@@ -231,7 +231,7 @@ def get_factor_data(iex_matched_entities: pd.DataFrame, secrets: Dict) -> pd.Dat
     """
     token: str = secrets["iex"]
 
-    balance_sheet_data = (
+    balance_sheet_data: pd.DataFrame = (
         iex_matched_entities.loc[:, ["symbol"]]
         .drop_duplicates()
         .assign(
@@ -239,11 +239,11 @@ def get_factor_data(iex_matched_entities: pd.DataFrame, secrets: Dict) -> pd.Dat
         )
     )
 
-    balancesheet = pd.concat(
+    balancesheet: pd.DataFrame = pd.concat(
         balance_sheet_data.balance_sheet.apply(balancesheet_to_frame).tolist()
     )
 
-    income_statement_data = (
+    income_statement_data: pd.DataFrame = (
         iex_matched_entities.loc[:, ["symbol"]]
         .drop_duplicates()
         .assign(
@@ -253,11 +253,11 @@ def get_factor_data(iex_matched_entities: pd.DataFrame, secrets: Dict) -> pd.Dat
         )
     )
 
-    income_statement = pd.concat(
+    income_statement: pd.DataFrame = pd.concat(
         income_statement_data.income_statement.apply(income_statement_to_frame).tolist()
     )
 
-    market_cap_data = (
+    market_cap_data: pd.DataFrame = (
         iex_matched_entities.loc[:, ["symbol"]]
         .drop_duplicates()
         .assign(market_cap=lambda df: df.symbol.apply(get_market_cap, token=token))
@@ -269,16 +269,20 @@ def get_factor_data(iex_matched_entities: pd.DataFrame, secrets: Dict) -> pd.Dat
 def get_price_data(
     iex_matched_entities: pd.DataFrame, release: Dict, window: Dict, secret: str
 ) -> pd.DataFrame:
-    token = secret["iex"]
-    release = pd.to_datetime(release["paradise_papers"])
+    token: str = secret["iex"]
+    release: pd.Timestamp = pd.to_datetime(release["paradise_papers"])
 
-    start = (release + pd.tseries.offsets.BDay(window["start"])).to_pydatetime()
+    start: pd.Timestamp = (
+        release + pd.tseries.offsets.BDay(window["start"])
+    ).to_pydatetime()
 
-    end = (release + pd.tseries.offsets.BDay(window["end"])).to_pydatetime()
+    end: pd.Timestamp = (
+        release + pd.tseries.offsets.BDay(window["end"])
+    ).to_pydatetime()
 
-    unique_tickers = iex_matched_entities.symbol.drop_duplicates().tolist()
+    unique_tickers: List = iex_matched_entities.symbol.drop_duplicates().tolist()
 
-    historical_prices = []
+    historical_prices: List = []
     chunks = np.array_split(unique_tickers, (len(unique_tickers)) // 100 + 1)
     for c in chunks:
         historical_prices.append(
@@ -292,9 +296,28 @@ def get_price_data(
             )
         )
 
-    paradise_price = pd.concat(historical_prices, axis=1)
+    paradise_price: pd.DataFrame = pd.concat(historical_prices, axis=1)
 
     return paradise_price
+
+
+def compute_centrality(
+    paradise_graph: nx.Graph, iex_matched_entities: pd.DataFrame
+) -> pd.DataFrame:
+    eigenvector_centrality: pd.DataFrame = nx.eigenvector_centrality(
+        paradise_graph, tol=1e-7, max_iter=5000
+    )
+    symbols_map: pd.DataFrame = iex_matched_entities.set_index("node_id").symbol
+
+    centrality: pd.DataFrame = (
+        pd.DataFrame({"centrality": eigenvector_centrality})
+        .join(symbols_map, how="left")
+        .groupby("symbol")
+        .head(1)
+        .set_index("symbol")
+    )
+
+    return centrality
 
 
 def get_basis(
@@ -303,9 +326,10 @@ def get_basis(
     price: pd.DataFrame,
     balancesheet: pd.DataFrame,
     income: pd.DataFrame,
+    centrality: pd.DataFrame,
     distances: pd.DataFrame,
     release: str,
-) -> pd.DataFrame:
+) -> Tuple[pd.DataFrame]:
     """
     Constructs the Basis matrix and pairwise distance matrix for our experiments
 
@@ -317,9 +341,9 @@ def get_basis(
         .exchange
     )
 
-    rf = ((1 + 3.18e-05) ** 5) - 1
+    rf: float = ((1 + 3.18e-05) ** 5) - 1
 
-    rm_rates = (
+    rm_rates: pd.DataFrame = (
         index.rename("index")
         .to_frame()
         .merge(
@@ -335,7 +359,7 @@ def get_basis(
         .rm.subtract(rf)
     )
 
-    returns = (
+    returns: pd.DataFrame = (
         price.loc[:, pd.IndexSlice[:, "close"]]
         .pct_change()
         .add(1)
@@ -345,15 +369,15 @@ def get_basis(
         .subtract(rf)
     )
 
-    returns.columns = returns.columns.droplevel(1)
-    returns = returns.T.rename(columns=lambda x: "returns").dropna()
-
-    returns = returns.assign(
-        excess=returns.returns.subtract(rm_rates).dropna(), rm=rm_rates
-    ).dropna()
+    returns.columns: pd.DataFrame = returns.columns.droplevel(1)
+    returns: pd.DataFrame = returns.T.rename(columns=lambda x: "returns").dropna()
+    returns["excess"]: pd.DataFrame = returns["returns"].subtract(
+        rm_rates.loc[returns.index]
+    )
+    returns["rm"]: pd.DataFrame = rm_rates.loc[returns.index].to_frame().to_numpy()
 
     # remove islands
-    inner_index = returns.join(
+    inner_index: pd.DataFrame = returns.join(
         (
             distances.where(lambda df: df.sum() > 0)
             .dropna(how="all")
@@ -363,10 +387,10 @@ def get_basis(
         how="inner",
     ).index
 
-    renamed_distances = distances.loc[inner_index, inner_index]
-    returns = returns.loc[inner_index, :]
+    renamed_distances: pd.DataFrame = distances.loc[inner_index, inner_index]
+    returns: pd.DataFrame = returns.loc[inner_index, :]
 
-    communities = (
+    communities: pd.DataFrame = (
         pd.get_dummies(
             renamed_distances.where(
                 lambda df: df.isna(), lambda df: df.apply(lambda x: x.index)
@@ -377,12 +401,9 @@ def get_basis(
         .T.reset_index(drop=True)
         .T
     )
-    communities = communities.loc[:, communities.sum() > 1]
+    communities: pd.DataFrame = communities.loc[:, communities.sum() > 1]
 
-    import ipdb
-
-    ipdb.set_trace()
-    factors = pd.merge_asof(
+    factors: pd.DataFrame = pd.merge_asof(
         returns.reset_index()
         .rename(columns={"index": "symbol"})
         .assign(reportDate=pd.to_datetime(release["paradise_papers"]))
@@ -406,7 +427,7 @@ def get_basis(
         direction="backward",
     )
 
-    average_price = (
+    average_price: pd.DataFrame = (
         price.loc[:, pd.IndexSlice[:, "close"]]
         .mean()
         .reset_index()
@@ -414,7 +435,7 @@ def get_basis(
         .set_index("symbol")
         .price
     )
-    features = (
+    features: pd.DataFrame = (
         factors.set_index("symbol")
         .fillna(factors.mean())
         .assign(alpha=1)
@@ -439,16 +460,15 @@ def get_basis(
                 "returns",
             ],
         ]
+        .join(centrality)
     )
 
-    i = set(features.index).intersection(set(renamed_distances.index))
+    i: Set = set(features.index).intersection(set(renamed_distances.index))
 
-    X, y, D = (
-        features.loc[i, :].drop(columns=["returns", "alpha"]),
-        features.loc[i, :]
-        .returns.to_frame()
-        .apply(winsorize, limits=[0.028 - 0.0, 0.062 + 0.02]),
-        renamed_distances.loc[i, i],
+    X: pd.DataFrame = features.loc[i, :].drop(columns=["returns", "alpha"])
+    y: pd.DataFrame = features.loc[i, ["returns"]].apply(
+        winsorize, limits=[0.028 - 0.0, 0.062 + 0.02]
     )
+    D: pd.DataFrame = renamed_distances.loc[i, i]
 
     return X, y, D

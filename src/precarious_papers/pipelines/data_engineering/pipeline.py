@@ -36,6 +36,7 @@ from .nodes import (
     compute_paradise_distances,
     get_iex_matched_entities,
     get_price_data,
+    compute_centrality,
     get_basis,
 )
 
@@ -81,6 +82,12 @@ def create_pipeline(**kwargs):
                 tags=["price"],
             ),
             node(
+                compute_centrality,
+                ["paradise_graph", "iex_matched_entities"],
+                "centrality",
+                tags=["centrality"],
+            ),
+            node(
                 get_basis,
                 dict(
                     matched="iex_matched_entities",
@@ -88,6 +95,7 @@ def create_pipeline(**kwargs):
                     price="paradise_price",
                     balancesheet="balance_sheet",
                     income="income_statement",
+                    centrality="centrality",
                     distances="paradise_distances",
                     release="params:release",
                 ),
