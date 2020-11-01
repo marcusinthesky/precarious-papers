@@ -1,5 +1,6 @@
 ##########################
 # KEDRO PROJECT
+TODO.md
 
 # ignore all local configuration
 conf/local/**
