@@ -28,6 +28,7 @@
 import string
 import warnings
 import json
+import datetime
 from typing import Dict, List, Set, Tuple
 
 import holoviews as hv
@@ -272,15 +273,19 @@ def get_price_data(
     token: str = secret["iex"]
     release: pd.Timestamp = pd.to_datetime(release["paradise_papers"])
 
-    start: pd.Timestamp = (
+    start: datetime.datetime = (
         release + pd.tseries.offsets.BDay(window["start"])
     ).to_pydatetime()
 
-    end: pd.Timestamp = (
+    end: datetime.datetime = (
         release + pd.tseries.offsets.BDay(window["end"])
     ).to_pydatetime()
 
     unique_tickers: List = iex_matched_entities.symbol.drop_duplicates().tolist()
+
+    import ipdb
+
+    ipdb.set_trace()
 
     historical_prices: List = []
     chunks = np.array_split(unique_tickers, (len(unique_tickers)) // 100 + 1)

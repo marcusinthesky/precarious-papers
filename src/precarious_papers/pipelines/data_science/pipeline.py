@@ -43,25 +43,25 @@ def create_pipeline(**kwargs):
                 get_spatial_weights,
                 ["X", "y", "D"],
                 "W",
-                tags="spatialweights",
+                tags=["spatialweights", "local"],
             ),
             node(
                 backwards_selection,
                 ["X", "y", "W"],
                 "nonspatialresults",
-                tags="nonspatialmodel",
+                tags=["nonspatialmodel", "local"],
             ),
             node(
                 get_slx_basis,
                 ["X", "W", "params:drop_features"],
                 "WX",
-                tags="slx",
+                tags=["slx", "local"],
             ),
             node(
                 backwards_selection,
                 ["WX", "y", "W"],
                 "spatialresults",
-                tags="spatialmodel",
+                tags=["spatialmodel", "local"],
             ),
         ]
     )

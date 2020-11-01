@@ -54,7 +54,7 @@ def create_pipeline(**kwargs):
                     "paradise_nodes_other",
                 ],
                 "entities",
-                tags=["entities"],
+                tags=["entities", "local"],
             ),
             node(
                 get_iex_matched_entities,
@@ -68,12 +68,14 @@ def create_pipeline(**kwargs):
                 ["balance_sheet", "income_statement", "market_cap"],
                 tags=["factors"],
             ),
-            node(get_graph, ["paradise_edges"], "paradise_graph", tags=["graph"]),
+            node(
+                get_graph, ["paradise_edges"], "paradise_graph", tags=["graph", "local"]
+            ),
             node(
                 compute_paradise_distances,
                 ["iex_matched_entities", "paradise_graph"],
                 "paradise_distances",
-                tags=["distances"],
+                tags=["distances", "local"],
             ),
             node(
                 get_price_data,
@@ -85,7 +87,7 @@ def create_pipeline(**kwargs):
                 compute_centrality,
                 ["paradise_graph", "iex_matched_entities"],
                 "centrality",
-                tags=["centrality"],
+                tags=["centrality", "local"],
             ),
             node(
                 get_basis,
@@ -100,7 +102,7 @@ def create_pipeline(**kwargs):
                     release="params:release",
                 ),
                 ["X", "y", "D"],
-                tags=["basis"],
+                tags=["basis", "local"],
             ),
         ]
     )
