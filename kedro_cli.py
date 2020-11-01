@@ -104,7 +104,7 @@ def _reformat_load_versions(  # pylint: disable=unused-argument
     ctx, param, value
 ) -> Dict[str, str]:
     """Reformat data structure from tuple to dictionary for `load-version`.
-        E.g ('dataset1:time1', 'dataset2:time2') -> {"dataset1": "time1", "dataset2": "time2"}.
+    E.g ('dataset1:time1', 'dataset2:time2') -> {"dataset1": "time1", "dataset2": "time2"}.
     """
     load_versions_dict = {}
 
@@ -235,12 +235,22 @@ def run(
     )
 
 
+@click.command()
+def document():
+    os.system("kedro build-docs")
+    os.system("mv docs/build/html/* docs/")
+    os.system("rm -rf docs/html")
+    os.system("rm -rf docs/build")
+    os.system("touch docs/.nojekyll")
+
+
 cli.add_command(pipeline_group)
 cli.add_command(catalog_group)
 cli.add_command(jupyter_group)
 
 for command in project_group.commands.values():
     cli.add_command(command)
+    cli.add_command(document)
 
 
 if __name__ == "__main__":
