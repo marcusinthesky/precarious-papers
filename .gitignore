@@ -11,6 +11,7 @@ conf/**/*credentials*
 # ignore everything in the following folders
 data/**
 logs/**
+endpoints/**
 mlruns/**
 
 # except their sub-folders
@@ -20,7 +21,7 @@ mlruns/**
 # also keep all .gitkeep files
 !.gitkeep
 
-# keep also the example dataset
+# also keep the example dataset
 !data/01_raw/iris.csv
 
 
@@ -150,6 +151,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.pem
 
 # mkdocs documentation
 /site

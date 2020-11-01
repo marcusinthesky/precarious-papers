@@ -47,6 +47,9 @@ kedro run --tag=local --parallel
 ```
 This will assume all data is already available in the data directory.
 
+The pipeline currently follows the current `io` topology:
+![pipeline topology](kedro-pipeline.png)
+
 
 ### Working with Kedro from notebooks
 Our analysis does provide `py:percent` format notebook which provides discussion over our exploratory work. This can be run either directly in a notebook environment that support `py:percent`, like VSCode, or may be converted to `ipynb` files using:

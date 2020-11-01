@@ -49,8 +49,12 @@ hv.extension("bokeh")
 
 
 def get_iex_symbols(secret: str) -> pd.DataFrame:
-    """
-    Calls IEXCloud API to get symbols for all securities.
+    """Calls IEXCloud API to get symbols for all securities.
+
+    :param secret: Dict with {'iex': YOUR_TOKEN}
+    :type secret: str
+    :return:  Availible IEXCloud companies
+    :rtype: pd.DataFrame
     """
     token: str = secret["iex"]
     symbols: pd.DataFrame = get_symbols(output_format="pandas", token=token)
@@ -64,8 +68,18 @@ def get_entities(
     paradise_nodes_officer: pd.DataFrame,
     paradise_nodes_other: pd.DataFrame,
 ) -> pd.DataFrame:
-    """
-    Merges all entity types across files and defines index
+    """Merges all entity types across files and defines index
+
+    :param paradise_nodes_entity: Entity list from Paradise Papers ICIJ Metadata
+    :type paradise_nodes_entity: pd.DataFrame
+    :param paradise_nodes_intermediary: Intermediary list from Paradise Papers ICIJ Metadata
+    :type paradise_nodes_intermediary: pd.DataFrame
+    :param paradise_nodes_officer: Officer list from Paradise Papers ICIJ Metadata
+    :type paradise_nodes_officer: pd.DataFrame
+    :param paradise_nodes_other: Other entity list from Paradise Papers ICIJ Metadata
+    :type paradise_nodes_other: pd.DataFrame
+    :return: Nodes and nodes attributed for graph
+    :rtype: pd.DataFrame
     """
 
     entities: pd.DataFrame = (
@@ -88,8 +102,14 @@ def get_entities(
 def get_iex_matched_entities(
     entities: pd.DataFrame, symbols: pd.DataFrame
 ) -> pd.DataFrame:
-    """
-    Merged IEXCloud symbols and metadata with leak entities
+    """Merged IEXCloud symbols and metadata with leak entities
+
+    :param entities: Entities from Paradise Papers ICIJ graph
+    :type entities: pd.DataFrame
+    :param symbols: Information on IEXCloud securities
+    :type symbols: pd.DataFrame
+    :return: IEXCloud companies joined on ICIJ Graph Node metadata
+    :rtype: pd.DataFrame
     """
     iex_matched_entities: pd.DataFrame = (
         entities.assign(
@@ -114,8 +134,12 @@ def get_iex_matched_entities(
 
 
 def get_graph(paradise_edges: pd.DataFrame) -> nx.Graph:
-    """
-    Uses edge list to build graph
+    """Uses edge list to build graph
+
+    :param paradise_edges: Edge list of Paradise Papers ICIJ graph
+    :type paradise_edges: pd.DataFrame
+    :return: NetworkX graph of ICIJ node edges
+    :rtype: nx.Graph
     """
     paradise_graph: nx.Graph = nx.convert_matrix.from_pandas_edgelist(
         df=paradise_edges,
@@ -128,6 +152,17 @@ def get_graph(paradise_edges: pd.DataFrame) -> nx.Graph:
 
 
 def find_path_length(source: str, target: str, G: nx.Graph) -> int:
+    """Find the shortest path between nodes given a graph
+
+    :param source: NodeID in Paradise Papers graph
+    :type source: str
+    :param target: NodeID in Paradise Papers graph
+    :type target: str
+    :param G: Paradise Papers ICIJ graph
+    :type G: nx.Graph
+    :return: Shortest path length between nodes
+    :rtype: int
+    """
     try:
         return nx.shortest_path_length(G, source.item(), target.item())
     except nx.exception.NetworkXNoPath:
@@ -138,6 +173,15 @@ def find_path_length(source: str, target: str, G: nx.Graph) -> int:
 def compute_paradise_distances(
     iex_matched_entities: pd.DataFrame, paradise_graph: nx.Graph
 ) -> pd.DataFrame:
+    """Using Dijskas algorithm to find the shortest path between entities
+
+    :param iex_matched_entities: Joined IEXCloud firms and ICIJ graph entities[description]
+    :type iex_matched_entities: pd.DataFrame
+    :param paradise_graph: Paradise Papers ICIJ graph
+    :type paradise_graph: nx.Graph
+    :return: Shortest path length pairwise distance matrix
+    :rtype: pd.DataFrame
+    """
     D: np.ndarray = pairwise_distances(
         X=(iex_matched_entities.node_id.to_numpy().reshape(-1, 1)),
         metric=find_path_length,
@@ -163,8 +207,14 @@ def compute_paradise_distances(
 
 
 def get_balance_sheet(ticker: str, token: str) -> Dict:
-    """
-    Makes call to iexcloud for balance sheet data
+    """Makes call to iexcloud for balance sheet data
+
+    :param ticker: Firm ticker eg. AAPL for Apple computers
+    :type ticker: str
+    :param token: IEXCloud API key
+    :type token: str
+    :return: Balance sheet information for particular firm
+    :rtype: Dict
     """
     try:
         data_set: requests.Response = requests.get(
@@ -178,8 +228,12 @@ def get_balance_sheet(ticker: str, token: str) -> Dict:
 
 
 def balancesheet_to_frame(d: Dict) -> pd.DataFrame:
-    """
-    Formats balance sheet data
+    """Formats balance sheet data
+
+    :param d: Balance sheet information for particular firm
+    :type d: Dict
+    :return: Reformatted Balance sheet information
+    :rtype: pd.DataFrame
     """
     if "balancesheet" in d.keys() and "symbol" in d.keys():
         return pd.DataFrame(d["balancesheet"]).assign(symbol=d["symbol"])
@@ -187,9 +241,15 @@ def balancesheet_to_frame(d: Dict) -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def get_income_statement(ticker, token) -> Dict:
-    """
-    Makes call to iexcloud for income statement data
+def get_income_statement(ticker: str, token: str) -> Dict:
+    """Makes call to iexcloud for income statement data
+
+    :param ticker: Stock ticker eg AAPL for Apple Computers
+    :type ticker: str
+    :param token: IEXCloud API key
+    :type token: str
+    :return: Firm income statement information
+    :rtype: Dict
     """
     try:
         data_set: requests.Response = requests.get(
@@ -202,8 +262,13 @@ def get_income_statement(ticker, token) -> Dict:
 
 
 def income_statement_to_frame(d: Dict) -> pd.DataFrame:
-    """
-    Formats income statement data
+    """Formats income statement data
+
+
+    :param d: [description]
+    :type d: Dict
+    :return: Reformatted Firm income statement information
+    :rtype: pd.DataFrame
     """
     if "income" in d.keys() and "symbol" in d.keys():
         return pd.DataFrame(d["income"]).assign(symbol=d["symbol"])
@@ -212,8 +277,14 @@ def income_statement_to_frame(d: Dict) -> pd.DataFrame:
 
 
 def get_market_cap(ticker: str, token: str) -> Dict:
-    """
-    Makes call to iexcloud for marketcap data
+    """Makes call to iexcloud for marketcap data
+
+    :param ticker: Firm ticker eg. AAPL for Apple computers
+    :type ticker: str
+    :param token: IEXCloud API key
+    :type token: str
+    :return: Firm security market capitalization
+    :rtype: Dict
     """
     try:
         data_set: requests.Response = requests.get(
@@ -227,8 +298,14 @@ def get_market_cap(ticker: str, token: str) -> Dict:
 
 
 def get_factor_data(iex_matched_entities: pd.DataFrame, secrets: Dict) -> pd.DataFrame:
-    """
-    Pulls, formats and merges firm characteristic data from IEXCloud
+    """Pulls, formats and merges firm characteristic data from IEXCloud
+
+    :param iex_matched_entities: Joined IEXCloud firms and ICIJ graph entities[description]
+    :type iex_matched_entities: pd.DataFrame
+    :param secrets: Dict with {'iex': YOUR_TOKEN}
+    :type secrets: Dict
+    :return: Merged firm balance sheet, income state and market cap information
+    :rtype: pd.DataFrame
     """
     token: str = secrets["iex"]
 
@@ -270,6 +347,19 @@ def get_factor_data(iex_matched_entities: pd.DataFrame, secrets: Dict) -> pd.Dat
 def get_price_data(
     iex_matched_entities: pd.DataFrame, release: Dict, window: Dict, secret: str
 ) -> pd.DataFrame:
+    """Query iexcloud api for price data
+
+    :param iex_matched_entities: Joined IEXCloud firms and ICIJ graph entities[description]
+    :type iex_matched_entities: pd.DataFrame
+    :param release: Date of release of leak
+    :type release: Dict
+    :param window: +- window for study from O'Donovan
+    :type window: Dict
+    :param secret: Dict with {'iex': YOUR_TOKEN}
+    :type secret: str
+    :return: Firm security price data over event window
+    :rtype: pd.DataFrame
+    """
     token: str = secret["iex"]
     release: pd.Timestamp = pd.to_datetime(release["paradise_papers"])
 
@@ -305,6 +395,15 @@ def get_price_data(
 def compute_centrality(
     paradise_graph: nx.Graph, iex_matched_entities: pd.DataFrame
 ) -> pd.DataFrame:
+    """[summary]
+
+    :param paradise_graph: Paradise papers graph
+    :type paradise_graph: nx.Graph
+    :param iex_matched_entities: Joined IEXCloud firms and ICIJ graph entities[description]
+    :type iex_matched_entities: pd.DataFrame
+    :return: Eigenvector centrality of firms in ICIJ graph
+    :rtype: pd.DataFrame
+    """
     eigenvector_centrality: pd.DataFrame = nx.eigenvector_centrality(
         paradise_graph, tol=1e-7, max_iter=5000
     )
@@ -331,12 +430,29 @@ def get_basis(
     distances: pd.DataFrame,
     release: str,
 ) -> Tuple[pd.DataFrame]:
-    """
-    Constructs the Basis matrix and pairwise distance matrix for our experiments
+    """Constructs the Basis matrix and pairwise distance matrix for our experiments
 
+    :param matched: Matched graph nodes and listed companies
+    :type matched: pd.DataFrame
+    :param indices: Firm indices
+    :type indices: pd.DataFrame
+    :param price: Firm price over event window
+    :type price: pd.DataFrame
+    :param balancesheet: firm balancesheet
+    :type balancesheet: pd.DataFrame
+    :param income: Firm income statement
+    :type income: pd.DataFrame
+    :param centrality: Firm global graph centrality
+    :type centrality: pd.DataFrame
+    :param distances: shortest-path distance matrix
+    :type distances: pd.DataFrame
+    :param release: Date of Paradise Papers release
+    :type release: str
+    :return: Firm characteristics, subsetting pairwise shortest-path distance matrix and returns
+    :rtype: Tuple[pd.DataFrame]
     """
 
-    intersecting_index = pd.DataFrame(
+    intersecting_index: Set = pd.DataFrame(
         {
             "symbol": list(
                 set(matched.symbol)
@@ -349,14 +465,18 @@ def get_basis(
         }
     )
 
-    matched = matched.merge(intersecting_index, how="inner", on="symbol")
-    price = price.loc[:, pd.IndexSlice[intersecting_index.symbol, :]]
-    balancesheet = balancesheet.merge(intersecting_index, how="inner", on="symbol")
-    income = income.merge(intersecting_index, how="inner", on="symbol")
-    centrality = centrality.loc[intersecting_index.symbol, :]
-    distances = distances.loc[intersecting_index.symbol, intersecting_index.symbol]
+    matched: pd.DataFrame = matched.merge(intersecting_index, how="inner", on="symbol")
+    price: pd.DataFrame = price.loc[:, pd.IndexSlice[intersecting_index.symbol, :]]
+    balancesheet: pd.DataFrame = balancesheet.merge(
+        intersecting_index, how="inner", on="symbol"
+    )
+    income: pd.DataFrame = income.merge(intersecting_index, how="inner", on="symbol")
+    centrality: pd.DataFrame = centrality.loc[intersecting_index.symbol, :]
+    distances: pd.DataFrame = distances.loc[
+        intersecting_index.symbol, intersecting_index.symbol
+    ]
 
-    index = (
+    index: pd.Series = (
         matched.groupby("symbol")
         .apply(lambda df: df.sample(1))
         .set_index("symbol")
