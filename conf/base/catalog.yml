@@ -1,7 +1,7 @@
 # Here you can define all your data sets by using simple YAML syntax.
 #
 # Documentation for this file format can be found in "The Data Catalog"
-# Link: https://kedro.readthedocs.io/en/stable/04_user_guide/04_data_catalog.html
+# Link: https://kedro.readthedocs.io/en/stable/04_user_guide/04_catalog.html
 #
 # We support interacting with a variety of data stores including local file systems, cloud, network and HDFS
 #
@@ -37,17 +37,140 @@
 #
 # The Data Catalog supports being able to reference the same file using two different DataSet implementations
 # (transcoding), templating and a way to reuse arguments that are frequently repeated. See more here:
-# https://kedro.readthedocs.io/en/stable/04_user_guide/04_data_catalog.html
+# https://kedro.readthedocs.io/en/stable/04_user_guide/04_catalog.html
 
-#
-# This is a data set used by the "Hello World" example pipeline provided with the project
-# template. Please feel free to remove it once you remove the example pipeline.
+secrets:
+  type: yaml.YAMLDataSet
+  filepath: conf/local/secrets.yml
 
-remote_famafrenchfivefactordaily_data:
+# Paradise papers
+## raw
+paradise_edges:
+  type: CachedDataSet
+  versioned: true
+  dataset:
+    type: pandas.CSVDataSet
+    filepath: data/01_raw/csv_paradise_papers.2018-02-14/paradise_papers.edges.csv
+
+paradise_nodes_address:
   type: pandas.CSVDataSet
-  filepath: data/01_raw/F-F_Research_Data_5_Factors_2x3_daily.CSV
+  filepath: data/01_raw/csv_paradise_papers.2018-02-14/paradise_papers.nodes.address.csv
+
+paradise_nodes_entity:
+  type: pandas.CSVDataSet
+  filepath: data/01_raw/csv_paradise_papers.2018-02-14/paradise_papers.nodes.entity.csv
+
+paradise_nodes_intermediary:
+  type: pandas.CSVDataSet
+  filepath: data/01_raw/csv_paradise_papers.2018-02-14/paradise_papers.nodes.intermediary.csv
+
+paradise_nodes_officer:
+  type: pandas.CSVDataSet
+  filepath: data/01_raw/csv_paradise_papers.2018-02-14/paradise_papers.nodes.officer.csv
+
+paradise_nodes_other:
+  type: pandas.CSVDataSet
+  filepath: data/01_raw/csv_paradise_papers.2018-02-14/paradise_papers.nodes.other.csv
+
+indices:
+  type: pandas.CSVDataSet
+  filepath: data/01_raw/exchange_prices.csv
   load_args:
-    index_col: 0
-    skiprows: 3
+    parse_dates:
+      - Date
+    index_col:
+      - Date
 
+## intermediate
+paradise_price:
+  type: pandas.ParquetDataSet
+  filepath: data/02_intermediate/paradise_papers_price.parquet
+  versioned: True
 
+paradise_graph:
+  type: CachedDataSet
+  versioned: true
+  dataset:
+    type: networkx.NetworkXDataSet
+    filepath: data/02_intermediate/paradise_papers_graph.json
+
+balance_sheet:
+  type: pandas.ParquetDataSet
+  filepath: data/02_intermediate/balance_sheet.parquet
+  versioned: True
+
+income_statement:
+  type: pandas.ParquetDataSet
+  filepath: data/02_intermediate/income_statement.parquet
+  versioned: True
+
+market_cap:
+  type: pandas.ParquetDataSet
+  filepath: data/02_intermediate/market_cap.parquet
+  versioned: True
+
+# IEX Symbols
+symbols:
+  type: pandas.ParquetDataSet
+  filepath: data/02_intermediate/iex_symbols.parquet
+  versioned: True
+
+entities:
+  type: pandas.ParquetDataSet
+  filepath: data/02_intermediate/entities.parquet
+  versioned: True
+
+iex_matched_entities:
+  type: pandas.ParquetDataSet
+  filepath: data/02_intermediate/iex_matched_symbols.parquet
+  versioned: True
+
+paradise_distances:
+  type: pandas.ParquetDataSet
+  filepath: data/03_primary/renamed_distances.parquet
+  versioned: True
+
+D:
+  type: pandas.ParquetDataSet
+  filepath: data/04_features/D.parquet
+  versioned: True
+
+feature:
+  type: pandas.ParquetDataSet
+  filepath: data/04_features/feature.parquet
+  versioned: True
+
+centrality:
+  type: pandas.ParquetDataSet
+  filepath: data/04_features/centrality.parquet
+  versioned: True
+
+X:
+  type: pandas.ParquetDataSet
+  filepath: data/05_model_input/X.parquet
+  versioned: True
+
+y:
+  type: pandas.ParquetDataSet
+  filepath: data/05_model_input/y.parquet
+  versioned: True
+
+W:
+  type: pandas.ParquetDataSet
+  filepath: data/05_model_input/W.parquet
+  versioned: True
+
+WX:
+  type: pandas.ParquetDataSet
+  filepath: data/05_model_input/WX.parquet
+  versioned: True
+
+nonspatialresults:
+  type: pandas.CSVDataSet
+  filepath: data/08_reporting/nonspatialresults.csv
+  versioned: True
+
+spatialresults:
+  type: pandas.CSVDataSet
+  filepath: data/08_reporting/spatialresults.csv
+  versioned: True

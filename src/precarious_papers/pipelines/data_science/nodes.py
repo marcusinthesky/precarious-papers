@@ -25,85 +25,160 @@
 #
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-"""Example code for the nodes in the example pipeline. This code is meant
-just for illustrating basic Kedro features.
-
-Delete this when you start working on your own Kedro project.
-"""
 # pylint: disable=invalid-name
-
-import logging
-from typing import Any, Dict
+from typing import List
 
 import numpy as np
 import pandas as pd
+from scipy import stats
+import pysal as ps
 
 
-def train_model(
-    train_x: pd.DataFrame, train_y: pd.DataFrame, parameters: Dict[str, Any]
-) -> np.ndarray:
-    """Node for training a simple multi-class logistic regression model. The
-    number of training iterations as well as the learning rate are taken from
-    conf/project/parameters.yml. All of the data as well as the parameters
-    will be provided to this function at the time of execution.
+def get_spatial_statistics(spatial_model: ps.model.spreg.ols.OLS) -> pd.Series:
+    statistics: pd.Series = pd.Series(
+        {
+            "F-statistic": "{} ({})".format(
+                round(spatial_model.f_stat[0], 3), round(spatial_model.f_stat[1], 3)
+            ),
+            "Jarque-Bera": "{} ({})".format(
+                round(spatial_model.jarque_bera["jb"], 3),
+                round(spatial_model.jarque_bera["pvalue"], 3),
+            ),
+            "Breusch-Pagan": "{} ({})".format(
+                round(spatial_model.breusch_pagan["bp"], 3),
+                round(spatial_model.breusch_pagan["pvalue"], 3),
+            ),
+            "Koenker-Basset": "{} ({})".format(
+                round(spatial_model.koenker_bassett["kb"], 3),
+                round(spatial_model.koenker_bassett["pvalue"], 3),
+            ),
+            "White": "{} ({})".format(
+                round(spatial_model.white["wh"], 3),
+                round(spatial_model.white["pvalue"], 3),
+            ),
+            "Moran’s I (error)": "{} ({})".format(
+                round(spatial_model.moran_res[-2], 3),
+                round(spatial_model.moran_res[-1], 3),
+            ),
+            "Robust LM (lag)": "{} ({})".format(
+                round(spatial_model.rlm_error[-2], 3),
+                round(spatial_model.rlm_error[-1], 3),
+            ),
+            "Robust LM (error)": "{} ({})".format(
+                round(spatial_model.rlm_lag[-2], 3), round(spatial_model.rlm_lag[-1], 3)
+            ),
+        }
+    )
+
+    return statistics
+
+
+def backwards_selection(
+    X: pd.DataFrame, y: pd.DataFrame, W: pd.DataFrame
+) -> pd.DataFrame:
     """
-    num_iter = parameters["example_num_train_iter"]
-    lr = parameters["example_learning_rate"]
-    X = train_x.to_numpy()
-    Y = train_y.to_numpy()
-
-    # Add bias to the features
-    bias = np.ones((X.shape[0], 1))
-    X = np.concatenate((bias, X), axis=1)
-
-    weights = []
-    # Train one model for each class in Y
-    for k in range(Y.shape[1]):
-        # Initialise weights
-        theta = np.zeros(X.shape[1])
-        y = Y[:, k]
-        for _ in range(num_iter):
-            z = np.dot(X, theta)
-            h = _sigmoid(z)
-            gradient = np.dot(X.T, (h - y)) / y.size
-            theta -= lr * gradient
-        # Save the weights for each model
-        weights.append(theta)
-
-    # Return a joint multi-class model with weights for all classes
-    return np.vstack(weights).transpose()
-
-
-def predict(model: np.ndarray, test_x: pd.DataFrame) -> np.ndarray:
-    """Node for making predictions given a pre-trained model and a test set.
+    Formulate model estimates as tabular results
     """
-    X = test_x.to_numpy()
+    w: ps.lib.weights.weights.W = ps.lib.weights.full2W(W.to_numpy())
 
-    # Add bias to the features
-    bias = np.ones((X.shape[0], 1))
-    X = np.concatenate((bias, X), axis=1)
+    coefficients: List = []
+    statistics: List = []
+    for i in range(X.shape[1]):
 
-    # Predict "probabilities" for each class
-    result = _sigmoid(np.dot(X, model))
+        spatial_model: ps.model.spreg.ols.OLS = ps.model.spreg.OLS(
+            y.to_numpy(),
+            X.to_numpy(),
+            w=w,
+            moran=True,
+            spat_diag=True,
+            white_test=True,
+            robust=None,
+            name_w="Weibull Kernel over Shortest Path Length",
+            name_ds="Paradise Papers Metadata",
+            name_y=y.columns.tolist(),
+            name_x=X.columns.tolist(),
+        )
 
-    # Return the index of the class with max probability for all samples
-    return np.argmax(result, axis=1)
+        coefficients.append(
+            pd.DataFrame(
+                {
+                    i: [
+                        f"{np.format_float_scientific(c, precision=3, exp_digits=2)}\
+                            ({round(p, 3)})"
+                        for c, p in zip(
+                            spatial_model.betas.flatten(),
+                            np.array(spatial_model.t_stat)[:, 1],
+                        )
+                    ]
+                },
+                index=spatial_model.name_x,
+            )
+        )
+
+        statistics.append(get_spatial_statistics(spatial_model).to_frame(i))
+
+        significances: np.ndarray = np.array(spatial_model.t_stat)[2:, 1]
+
+        if len(significances) > 0:
+            arg_least_significant = significances.argmax()
+            least_significant = spatial_model.name_x[2:][arg_least_significant]
+        else:
+            least_significant = spatial_model.name_x[1]
+
+        X = X.drop(columns=[least_significant])
+
+    c: pd.DataFrame = pd.concat(coefficients, axis=1).fillna("")
+    c: pd.DataFrame = c.loc[c.eq("").sum(1).sort_values(ascending=False).index, :]
+
+    s: pd.DataFrame = pd.concat(statistics, axis=1).fillna("")
+
+    return (
+        pd.concat([c, s]).reset_index().rename(columns={"index": "Estimate"}).fillna("")
+    )
 
 
-def report_accuracy(predictions: np.ndarray, test_y: pd.DataFrame) -> None:
-    """Node for reporting the accuracy of the predictions performed by the
-    previous node. Notice that this function has no outputs, except logging.
+def get_spatial_weights(
+    X: pd.DataFrame, y: pd.DataFrame, D: pd.DataFrame
+) -> pd.DataFrame:
     """
-    # Get true class index
-    target = np.argmax(test_y.to_numpy(), axis=1)
-    # Calculate accuracy of predictions
-    accuracy = np.sum(predictions == target) / target.shape[0]
-    # Log the accuracy of the model
-    log = logging.getLogger(__name__)
-    log.info("Model accuracy on test set: %0.2f%%", accuracy * 100)
+    estimate weighting matrix and estimate
+    """
+    # weibull
+    W: pd.DataFrame = (
+        D.loc[y.index, y.index]
+        .replace(0, np.nan)
+        .pipe(
+            lambda df: df.apply(
+                stats.weibull_min(
+                    *stats.weibull_min.fit(df.melt().value.dropna(), floc=0, f0=1)
+                ).pdf
+            )
+        )
+        .fillna(0)
+        .apply(lambda df: df / df.sum(), axis=1)
+        .pipe(
+            lambda df: df.where(lambda df: df.sum(1) != 0).fillna(
+                (df.shape[0] - 1) ** -1
+            )
+        )
+        .pipe(lambda df: df * (1 - np.eye(df.shape[0])))
+        .apply(lambda df: df / df.sum(), axis=1)
+    )
+    assert np.all(np.diag(W) == 0)
+    assert W.sum(1).apply(np.testing.assert_almost_equal, desired=1).all()
+    assert (W.index == y.index).all()
+    assert (W.columns == y.index).all()
+    assert W.var().nunique() > 1
+
+    return W
 
 
-def _sigmoid(z):
-    """A helper sigmoid function used by the training and the scoring nodes."""
-    return 1 / (1 + np.exp(-z))
+def get_slx_basis(
+    X: pd.DataFrame,
+    W: pd.DataFrame,
+    drop_features: List = ["price_to_earnings", "market_capitalization", "centrality"],
+) -> pd.DataFrame:
+    Z: pd.DataFrame = X.drop(columns=drop_features).pipe(
+        lambda df: df.join((W @ df).rename(columns=lambda s: "W_" + s))
+    )
+    return Z

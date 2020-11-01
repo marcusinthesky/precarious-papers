@@ -6,3 +6,17 @@ example_test_data_ratio: 0.2
 example_num_train_iter: 10000
 example_learning_rate: 0.01
 
+release:
+    paradise_papers: "2017-11-5"
+    offshore_leaks: "2013-6-14"
+    panama_papers: "2016-4-3"
+    bahamas_leaks: "2016-8-21"
+
+window:
+    start: -1
+    end: 3
+
+drop_features:
+    - price_to_earnings
+    - market_capitalization
+    - centrality

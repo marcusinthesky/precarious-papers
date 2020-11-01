@@ -26,29 +26,83 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Example code for the nodes in the example pipeline. This code is meant
-just for illustrating basic Kedro features.
-
-Delete this when you start working on your own Kedro project.
-"""
-
 from kedro.pipeline import Pipeline, node
 
-from .nodes import split_data
+from .nodes import (
+    get_iex_symbols,
+    get_entities,
+    get_factor_data,
+    get_graph,
+    compute_paradise_distances,
+    get_iex_matched_entities,
+    get_price_data,
+    compute_centrality,
+    get_basis,
+)
 
 
 def create_pipeline(**kwargs):
     return Pipeline(
         [
+            node(get_iex_symbols, ["secrets"], "symbols", tags=["symbols"]),
             node(
-                split_data,
-                ["example_iris_data", "params:example_test_data_ratio"],
+                get_entities,
+                [
+                    "paradise_nodes_entity",
+                    "paradise_nodes_intermediary",
+                    "paradise_nodes_officer",
+                    "paradise_nodes_other",
+                ],
+                "entities",
+                tags=["entities", "local"],
+            ),
+            node(
+                get_iex_matched_entities,
+                ["entities", "symbols"],
+                "iex_matched_entities",
+                tags=["matched"],
+            ),
+            node(
+                get_factor_data,
+                ["iex_matched_entities", "secrets"],
+                ["balance_sheet", "income_statement", "market_cap"],
+                tags=["factors"],
+            ),
+            node(
+                get_graph, ["paradise_edges"], "paradise_graph", tags=["graph", "local"]
+            ),
+            node(
+                compute_paradise_distances,
+                ["iex_matched_entities", "paradise_graph"],
+                "paradise_distances",
+                tags=["distances", "local"],
+            ),
+            node(
+                get_price_data,
+                ["iex_matched_entities", "params:release", "params:window", "secrets"],
+                "paradise_price",
+                tags=["price"],
+            ),
+            node(
+                compute_centrality,
+                ["paradise_graph", "iex_matched_entities"],
+                "centrality",
+                tags=["centrality", "local"],
+            ),
+            node(
+                get_basis,
                 dict(
-                    train_x="example_train_x",
-                    train_y="example_train_y",
-                    test_x="example_test_x",
-                    test_y="example_test_y",
+                    matched="iex_matched_entities",
+                    indices="indices",
+                    price="paradise_price",
+                    balancesheet="balance_sheet",
+                    income="income_statement",
+                    centrality="centrality",
+                    distances="paradise_distances",
+                    release="params:release",
                 ),
-            )
+                ["X", "y", "D"],
+                tags=["basis", "local"],
+            ),
         ]
     )

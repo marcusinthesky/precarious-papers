@@ -1,0 +1,10 @@
+version: "3"
+
+services:
+    python:
+        build:
+            context: .
+            dockerfile: ./compose/python/Dockerfile.yml
+
+        volumes:
+            - .:/app

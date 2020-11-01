@@ -1,0 +1,14 @@
+FROM continuumio/miniconda3:4.8.2
+WORKDIR /app
+RUN apt-get update --fix-missing && \
+apt install -y libxt6 libdbus-glib-1-dev libgtk-3-0 glibc-source && \
+conda install -y -c conda-forge mamba && \
+mamba install -y cmake compilers pybind11 libsolv libarchive libcurl nlohmann_json pip cpp-filesystem yaml-cpp -c conda-forge
+
+# install dependencies
+COPY src/conda.yml src/requirements.txt src/
+RUN mamba install -y --file src/conda.yml && \
+pip install -r src/requirements.txt
+
+# run project pipeline from local files
+CMD kedro run --tag=local --parallel

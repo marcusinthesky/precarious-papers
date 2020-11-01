@@ -33,23 +33,35 @@ Delete this when you start working on your own Kedro project.
 """
 
 from kedro.pipeline import Pipeline, node
-
-from .nodes import predict, report_accuracy, train_model
+from .nodes import get_spatial_weights, get_slx_basis, backwards_selection
 
 
 def create_pipeline(**kwargs):
     return Pipeline(
         [
             node(
-                train_model,
-                ["example_train_x", "example_train_y", "parameters"],
-                "example_model",
+                get_spatial_weights,
+                ["X", "y", "D"],
+                "W",
+                tags=["spatialweights", "local"],
             ),
             node(
-                predict,
-                dict(model="example_model", test_x="example_test_x"),
-                "example_predictions",
+                backwards_selection,
+                ["X", "y", "W"],
+                "nonspatialresults",
+                tags=["nonspatialmodel", "local"],
             ),
-            node(report_accuracy, ["example_predictions", "example_test_y"], None),
+            node(
+                get_slx_basis,
+                ["X", "W", "params:drop_features"],
+                "WX",
+                tags=["slx", "local"],
+            ),
+            node(
+                backwards_selection,
+                ["WX", "y", "W"],
+                "spatialresults",
+                tags=["spatialmodel", "local"],
+            ),
         ]
     )
