@@ -46,8 +46,11 @@ secrets:
 # Paradise papers
 ## raw
 paradise_edges:
-  type: pandas.CSVDataSet
-  filepath: data/01_raw/csv_paradise_papers.2018-02-14/paradise_papers.edges.csv
+  type: kedro.contrib.io.cached.CachedDataSet
+  versioned: true
+  dataset:
+    type: pandas.CSVDataSet
+    filepath: data/01_raw/csv_paradise_papers.2018-02-14/paradise_papers.edges.csv
 
 paradise_nodes_address:
   type: pandas.CSVDataSet
@@ -76,18 +79,23 @@ paradise_price:
   versioned: True
 
 paradise_graph:
-  type: networkx.NetworkXDataSet
-  filepath: data/02_intermediate/paradise_papers_graph.json
-  versioned: True
+  type: kedro.contrib.io.cached.CachedDataSet
+  versioned: true
+  dataset:
+    type: networkx.NetworkXDataSet
+    filepath: data/02_intermediate/paradise_papers_graph.json
 
 indices:
-  type: pandas.CSVDataSet
-  filepath: data/02_intermediate/exchange_prices.csv
-  load_args:
-    parse_dates:
-      - Date
-    index_col:
-      - Date
+  type: kedro.contrib.io.cached.CachedDataSet
+  versioned: true
+  dataset:
+    type: pandas.CSVDataSet
+    filepath: data/02_intermediate/exchange_prices.csv
+    load_args:
+      parse_dates:
+        - Date
+      index_col:
+        - Date
 
 balance_sheet:
   type: pandas.ParquetDataSet
