@@ -222,13 +222,14 @@ def get_market_cap(ticker: str, token: str) -> Dict:
         return data_set.json()
 
     except requests.ConnectionError or json.decoder.JSONDecodeError:
-        return {}
+        return np.nan
 
 
-def get_factor_data(iex_matched_entities: pd.DataFrame, token: str) -> pd.DataFrame:
+def get_factor_data(iex_matched_entities: pd.DataFrame, secrets: Dict) -> pd.DataFrame:
     """
     Pulls, formats and merges firm characteristic data from IEXCloud
     """
+    token: str = secrets["iex"]
 
     balance_sheet_data = (
         iex_matched_entities.loc[:, ["symbol"]]
@@ -378,13 +379,24 @@ def get_basis(
     )
     communities = communities.loc[:, communities.sum() > 1]
 
+    import ipdb
+
+    ipdb.set_trace()
     factors = pd.merge_asof(
         returns.reset_index()
         .rename(columns={"index": "symbol"})
         .assign(reportDate=pd.to_datetime(release["paradise_papers"]))
         .sort_values("reportDate"),
         balancesheet.merge(
-            income.drop(columns=["minorityInterest", "fiscalDate", "currency"]),
+            income.pipe(
+                lambda df: df.drop(
+                    [
+                        h
+                        for h in df.columns
+                        if h in ["minorityInterest", "fiscalDate", "currency"]
+                    ]
+                )
+            ),
             on=["reportDate", "symbol"],
         )
         .assign(reportDate=lambda df: pd.to_datetime(df.reportDate))
@@ -429,12 +441,14 @@ def get_basis(
         ]
     )
 
+    i = set(features.index).intersection(set(renamed_distances.index))
+
     X, y, D = (
-        features.drop(columns=["returns", "alpha"]),
-        features.returns.to_frame().apply(
-            winsorize, limits=[0.028 - 0.0, 0.062 + 0.02]
-        ),
-        renamed_distances.loc[features.index, features.index],
+        features.loc[i, :].drop(columns=["returns", "alpha"]),
+        features.loc[i, :]
+        .returns.to_frame()
+        .apply(winsorize, limits=[0.028 - 0.0, 0.062 + 0.02]),
+        renamed_distances.loc[i, i],
     )
 
     return X, y, D

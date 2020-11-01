@@ -64,7 +64,7 @@ def create_pipeline(**kwargs):
             node(
                 get_factor_data,
                 ["iex_matched_entities", "secrets"],
-                ["balancesheet", "income_statement", "market_cap_data"],
+                ["balance_sheet", "income_statement", "market_cap"],
                 tags=["factors"],
             ),
             node(get_graph, ["paradise_edges"], "paradise_graph", tags=["graph"]),

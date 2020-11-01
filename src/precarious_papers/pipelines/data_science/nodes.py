@@ -131,7 +131,7 @@ def backwards_selection(
 
     s = pd.concat(statistics, axis=1).fillna("")
 
-    return pd.concat([c, s])
+    return pd.concat([c, s]).reset_index().rename(columns={"index": "Estimate"})
 
 
 def get_spatial_weights(

@@ -39,10 +39,6 @@
 # (transcoding), templating and a way to reuse arguments that are frequently repeated. See more here:
 # https://kedro.readthedocs.io/en/stable/04_user_guide/04_catalog.html
 
-#
-# This is a data set used by the "Hello World" example pipeline provided with the project
-# template. Please feel free to remove it once you remove the example pipeline.
-
 secrets:
   type: yaml.YAMLDataSet
   filepath: conf/local/secrets.yml
@@ -76,22 +72,17 @@ paradise_nodes_other:
 ## intermediate
 paradise_price:
   type: pandas.ParquetDataSet
-  filepath: data/02_intermediate/csv_paradise_papers.2018-02-14/paradise_papers_price.parquet
+  filepath: data/02_intermediate/paradise_papers_price.parquet
   versioned: True
 
 paradise_graph:
   type: networkx.NetworkXDataSet
-  filepath: data/02_intermediate/csv_paradise_papers.2018-02-14/paradise_papers_graph.json
-  versioned: True
-
-paradise_distances:
-  type: pandas.ParquetDataSet
-  filepath: data/02_intermediate/csv_paradise_papers.2018-02-14/paradise_papers_distances.parquet
+  filepath: data/02_intermediate/paradise_papers_graph.json
   versioned: True
 
 indices:
   type: pandas.CSVDataSet
-  filepath: data/01_raw/exchange_prices.csv
+  filepath: data/02_intermediate/exchange_prices.csv
   load_args:
     parse_dates:
       - Date
@@ -100,63 +91,73 @@ indices:
 
 balance_sheet:
   type: pandas.ParquetDataSet
-  filepath: data/01_raw/balance_sheet.parquet
+  filepath: data/02_intermediate/balance_sheet.parquet
 
 income_statement:
   type: pandas.ParquetDataSet
-  filepath: data/01_raw/income_statement.parquet
+  filepath: data/02_intermediate/income_statement.parquet
 
 market_cap:
   type: pandas.ParquetDataSet
-  filepath: data/01_raw/market_cap.parquet
+  filepath: data/02_intermediate/market_cap.parquet
 
 # IEX Symbols
 symbols:
   type: pandas.ParquetDataSet
-  filepath: data/01_raw/iex_symbols.parquet
+  filepath: data/02_intermediate/iex_symbols.parquet
   versioned: True
 
 entities:
   type: pandas.ParquetDataSet
-  filepath: data/01_raw/entities.parquet
+  filepath: data/02_intermediate/entities.parquet
   versioned: True
 
 iex_matched_entities:
   type: pandas.ParquetDataSet
-  filepath: data/01_raw/iex_matched_symbols.parquet
+  filepath: data/02_intermediate/iex_matched_symbols.parquet
   versioned: True
 
-X:
+paradise_distances:
   type: pandas.ParquetDataSet
-  filepath: data/03_features/X.parquet
-  versioned: True
-
-y:
-  type: pandas.ParquetDataSet
-  filepath: data/03_features/y.parquet
+  filepath: data/03_primary/renamed_distances.parquet
   versioned: True
 
 D:
   type: pandas.ParquetDataSet
-  filepath: data/03_features/W.parquet
+  filepath: data/04_features/D.parquet
+  versioned: True
+
+feature:
+  type: pandas.ParquetDataSet
+  filepath: data/04_features/feature.parquet
+  versioned: True
+
+X:
+  type: pandas.ParquetDataSet
+  filepath: data/05_model_input/X.parquet
+  versioned: True
+
+y:
+  type: pandas.ParquetDataSet
+  filepath: data/05_model_input/y.parquet
   versioned: True
 
 W:
   type: pandas.ParquetDataSet
-  filepath: data/03_features/W.parquet
+  filepath: data/05_model_input/W.parquet
   versioned: True
 
 WX:
   type: pandas.ParquetDataSet
-  filepath: data/03_features/W.parquet
+  filepath: data/05_model_input/WX.parquet
   versioned: True
 
 nonspatialresults:
   type: pandas.CSVDataSet
-  filepath: data/07_model_output
+  filepath: data/08_reporting/nonspatialresults.csv
   versioned: True
 
 spatialresults:
   type: pandas.CSVDataSet
-  filepath: data/07_model_output
+  filepath: data/08_reporting/spatialresults.csv
   versioned: True
