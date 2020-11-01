@@ -92,7 +92,7 @@ def backwards_selection(
     :type y: pd.DataFrame
     :param W: spatial weighting matrix
     :type W: pd.DataFrame
-    :return: Estimates and statitics from backwards selection procedure
+    :return: Estimates and statistics from backwards selection procedure
     :rtype: pd.DataFrame
     """
     w: ps.lib.weights.weights.W = ps.lib.weights.full2W(W.to_numpy())

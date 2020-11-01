@@ -70,13 +70,13 @@ def get_entities(
 ) -> pd.DataFrame:
     """Merges all entity types across files and defines index
 
-    :param paradise_nodes_entity: [description]
+    :param paradise_nodes_entity: Entity list from Paradise Papers ICIJ Metadata
     :type paradise_nodes_entity: pd.DataFrame
-    :param paradise_nodes_intermediary: [description]
+    :param paradise_nodes_intermediary: Intermediary list from Paradise Papers ICIJ Metadata
     :type paradise_nodes_intermediary: pd.DataFrame
-    :param paradise_nodes_officer: [description]
+    :param paradise_nodes_officer: Officer list from Paradise Papers ICIJ Metadata
     :type paradise_nodes_officer: pd.DataFrame
-    :param paradise_nodes_other: [description]
+    :param paradise_nodes_other: Other entity list from Paradise Papers ICIJ Metadata
     :type paradise_nodes_other: pd.DataFrame
     :return: Nodes and nodes attributed for graph
     :rtype: pd.DataFrame
@@ -104,9 +104,9 @@ def get_iex_matched_entities(
 ) -> pd.DataFrame:
     """Merged IEXCloud symbols and metadata with leak entities
 
-    :param entities: [description]
+    :param entities: Entities from Paradise Papers ICIJ graph
     :type entities: pd.DataFrame
-    :param symbols: [description]
+    :param symbols: Information on IEXCloud securities
     :type symbols: pd.DataFrame
     :return: IEXCloud companies joined on ICIJ Graph Node metadata
     :rtype: pd.DataFrame
@@ -136,7 +136,7 @@ def get_iex_matched_entities(
 def get_graph(paradise_edges: pd.DataFrame) -> nx.Graph:
     """Uses edge list to build graph
 
-    :param paradise_edges: [description]
+    :param paradise_edges: Edge list of Paradise Papers ICIJ graph
     :type paradise_edges: pd.DataFrame
     :return: NetworkX graph of ICIJ node edges
     :rtype: nx.Graph
@@ -154,11 +154,11 @@ def get_graph(paradise_edges: pd.DataFrame) -> nx.Graph:
 def find_path_length(source: str, target: str, G: nx.Graph) -> int:
     """Find the shortest path between nodes given a graph
 
-    :param source: [description]
+    :param source: NodeID in Paradise Papers graph
     :type source: str
-    :param target: [description]
+    :param target: NodeID in Paradise Papers graph
     :type target: str
-    :param G: [description]
+    :param G: Paradise Papers ICIJ graph
     :type G: nx.Graph
     :return: Shortest path length between nodes
     :rtype: int
@@ -177,7 +177,7 @@ def compute_paradise_distances(
 
     :param iex_matched_entities: Joined IEXCloud firms and ICIJ graph entities[description]
     :type iex_matched_entities: pd.DataFrame
-    :param paradise_graph: [description]
+    :param paradise_graph: Paradise Papers ICIJ graph
     :type paradise_graph: nx.Graph
     :return: Shortest path length pairwise distance matrix
     :rtype: pd.DataFrame
@@ -209,9 +209,9 @@ def compute_paradise_distances(
 def get_balance_sheet(ticker: str, token: str) -> Dict:
     """Makes call to iexcloud for balance sheet data
 
-    :param ticker: [description]
+    :param ticker: Firm ticker eg. AAPL for Apple computers
     :type ticker: str
-    :param token: [description]
+    :param token: IEXCloud API key
     :type token: str
     :return: Balance sheet information for particular firm
     :rtype: Dict
@@ -246,7 +246,7 @@ def get_income_statement(ticker: str, token: str) -> Dict:
 
     :param ticker: Stock ticker eg AAPL for Apple Computers
     :type ticker: str
-    :param token: [description]
+    :param token: IEXCloud API key
     :type token: str
     :return: Firm income statement information
     :rtype: Dict
@@ -279,9 +279,9 @@ def income_statement_to_frame(d: Dict) -> pd.DataFrame:
 def get_market_cap(ticker: str, token: str) -> Dict:
     """Makes call to iexcloud for marketcap data
 
-    :param ticker: [description]
+    :param ticker: Firm ticker eg. AAPL for Apple computers
     :type ticker: str
-    :param token: [description]
+    :param token: IEXCloud API key
     :type token: str
     :return: Firm security market capitalization
     :rtype: Dict
