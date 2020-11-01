@@ -35,6 +35,13 @@ import pysal as ps
 
 
 def get_spatial_statistics(spatial_model: ps.model.spreg.ols.OLS) -> pd.Series:
+    """Extracts and formals estimates and statistics from spatial model
+
+    :param spatial_model: Estimated pysal non-spatial ols model
+    :type spatial_model: ps.model.spreg.ols.OLS
+    :return: Model estimates and statistics
+    :rtype: pd.Series
+    """
     statistics: pd.Series = pd.Series(
         {
             "F-statistic": "{} ({})".format(
@@ -76,8 +83,17 @@ def get_spatial_statistics(spatial_model: ps.model.spreg.ols.OLS) -> pd.Series:
 def backwards_selection(
     X: pd.DataFrame, y: pd.DataFrame, W: pd.DataFrame
 ) -> pd.DataFrame:
-    """
-    Formulate model estimates as tabular results
+    """Formulate model estimates as tabular results
+
+
+    :param X: Firm characteristics
+    :type X: pd.DataFrame
+    :param y: Firm returns over event window
+    :type y: pd.DataFrame
+    :param W: spatial weighting matrix
+    :type W: pd.DataFrame
+    :return: Estimates and statitics from backwards selection procedure
+    :rtype: pd.DataFrame
     """
     w: ps.lib.weights.weights.W = ps.lib.weights.full2W(W.to_numpy())
 
@@ -140,8 +156,17 @@ def backwards_selection(
 def get_spatial_weights(
     X: pd.DataFrame, y: pd.DataFrame, D: pd.DataFrame
 ) -> pd.DataFrame:
-    """
-    estimate weighting matrix and estimate
+    """estimate weighting matrix and estimate
+
+
+    :param X: Firm characteristics
+    :type X: pd.DataFrame
+    :param y: Market returns
+    :type y: pd.DataFrame
+    :param D: Shortest path distances between firms
+    :type D: pd.DataFrame
+    :return: Spatial weighting matrix using weibull distribution
+    :rtype: pd.DataFrame
     """
     # weibull
     W: pd.DataFrame = (
@@ -178,6 +203,19 @@ def get_slx_basis(
     W: pd.DataFrame,
     drop_features: List = ["price_to_earnings", "market_capitalization", "centrality"],
 ) -> pd.DataFrame:
+    """estimate weighting matrix and estimate
+
+
+    :param X: Firm characteristics
+    :type X: pd.DataFrame
+    :param W: Spatial weighting matrix
+    :type W: pd.DataFrame
+    :param drop_features: Features to remove based on significance,
+        defaults to ["price_to_earnings", "market_capitalization", "centrality"]
+    :type drop_features: List, optional
+    :return: Model parameters estimates and statistical tests
+    :rtype: pd.DataFrame
+    """
     Z: pd.DataFrame = X.drop(columns=drop_features).pipe(
         lambda df: df.join((W @ df).rename(columns=lambda s: "W_" + s))
     )
