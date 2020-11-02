@@ -1,6 +1,5 @@
 ##########################
 # KEDRO PROJECT
-TODO.md
 
 # ignore all local configuration
 conf/local/**
@@ -12,7 +11,6 @@ conf/**/*credentials*
 # ignore everything in the following folders
 data/**
 logs/**
-endpoints/**
 mlruns/**
 
 # except their sub-folders
@@ -22,7 +20,7 @@ mlruns/**
 # also keep all .gitkeep files
 !.gitkeep
 
-# also keep the example dataset
+# keep also the example dataset
 !data/01_raw/iris.csv
 
 
@@ -67,7 +65,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-build/
+# build/
 develop-eggs/
 dist/
 downloads/
@@ -123,7 +121,9 @@ instance/
 .scrapy
 
 # Sphinx documentation
-docs/_build/
+# docs/_build/
+docs/build
+docs/html
 
 # PyBuilder
 target/
@@ -152,7 +152,6 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-.pem
 
 # mkdocs documentation
 /site
