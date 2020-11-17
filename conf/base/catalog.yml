@@ -165,6 +165,29 @@ WX:
   filepath: data/05_model_input/WX.parquet
   versioned: True
 
+nonspatialpearson:
+  type: pandas.CSVDataSet
+  filepath: data/08_reporting/nonspatialpearson.csv
+  versioned: True
+
+nonspatialspatialpearson:
+  type: pandas.CSVDataSet
+  filepath: data/08_reporting/nonspatialspatialpearson.csv
+  versioned: True
+
+spatialpearson:
+  type: pandas.CSVDataSet
+  filepath: data/08_reporting/spatialpearson.csv
+  versioned: True
+
+biplot:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/biplot.png
+
+explained_variance:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/explained_variance.png
+
 nonspatialresults:
   type: pandas.CSVDataSet
   filepath: data/08_reporting/nonspatialresults.csv
