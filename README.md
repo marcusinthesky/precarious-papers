@@ -23,6 +23,15 @@ To install them, run:
 ```
 kedro install
 ```
+and either:
+```
+conda install --file src/conda.yml
+```
+or:
+```
+mamba install --file src/conda.yml
+```
+For those using [mamba](https://github.com/mamba-org/mamba) alongside the [Anaconda package manager](https://docs.anaconda.com/)
 
 For those looking to run the pipeline, a docker container as been provided for use in reproducing our analysis. This can be run to recreate our environment using:
 ```
@@ -52,12 +61,12 @@ The pipeline currently follows the current `io` topology:
 
 
 ### Working with Kedro from notebooks
-Our analysis does provide `py:percent` format notebook which provides discussion over our exploratory work. This can be run either directly in a notebook environment that support `py:percent`, like VSCode, or may be converted to `ipynb` files using:
+Our analysis does provide `py:percent` format notebooks which provides discussion over our exploratory work. This can be run either directly in a notebook environment that support `py:percent`, like VSCode, or may be converted to `ipynb` files using:
 ```
 jupytext --to ipynb *.py
 ```
 
-In order to use notebooks in your Kedro project, you need to install Jupyter:
+In order to use notebooks in your Kedro project, you need to install Jupyter, this has already been included in our conda environment but is an important flag for those running our exploratory analysis:
 
 ```
 pip install jupyter
@@ -88,11 +97,11 @@ kedro ipython
 ```
 
 Running Jupyter or IPython this way provides the following variables in
-scope: `proj_dir`, `proj_name`, `conf`, `io`, `parameters` and `startup_error`.
+scope: `proj_dir`, `proj_name`, `conf`, `io`, `parameters` and `startup_error`. This abstracts and simplies interaction with our versioned datasets or API endpoints and ensure data is being loaded and serialized in a consistent manner. 
 
 
-## Building API documentation
-Project documentation has been provided to guide users through our code. This can be found at the `docs/build/html/index.html`.
+## API documentation
+Project documentation has been provided to guide users through our code. This can be found at the `docs/index.html`.
 
 To build API docs for your code using Sphinx, run:
 
@@ -101,3 +110,5 @@ kedro build-docs
 ```
 
 See your documentation by opening `docs/build/html/index.html`.
+
+A precommit hook has been added to this project to automatically build this documentation to be served on [Github Pages](https://pages.github.com/). This should allow users a familiar interface for navigating the documentation accoumpanying our code. 
