@@ -26,12 +26,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # pylint: disable=invalid-name
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 import pandas as pd
 from scipy import stats
 import pysal as ps
+from sklearn.metrics import pairwise_distances
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
 
 
 def get_spatial_statistics(spatial_model: ps.model.spreg.ols.OLS) -> pd.Series:
@@ -220,3 +224,85 @@ def get_slx_basis(
         lambda df: df.join((W @ df).rename(columns=lambda s: "W_" + s))
     )
     return Z
+
+
+def pearson_corr(X: pd.DataFrame, Y: pd.DataFrame) -> pd.DataFrame:
+    """Pearson correlation coefficients
+
+    :param X: Features for analysis
+    :type X: pd.DataFrame
+    :param Y: Features for analysis
+    :type Y: pd.DataFrame
+    :return: Pearson correlation coefficients with p-values
+    :rtype: pd.DataFrame
+    """
+    pearson_corr: pd.DataFrame = (
+        pd.DataFrame(
+            pairwise_distances(X.T, Y.T, metric=lambda x, y: stats.pearsonr(x, y)[0]),
+            index=X.columns,
+            columns=Y.columns,
+        )
+        .round(4)
+        .astype(str)
+    )
+    pearson_p: pd.DataFrame = (
+        pd.DataFrame(
+            pairwise_distances(X.T, Y.T, metric=lambda x, y: stats.pearsonr(x, y)[1]),
+            index=X.columns,
+            columns=Y.columns,
+        )
+        .round(4)
+        .astype(str)
+    )
+
+    return pearson_corr + pearson_p.applymap(lambda s: f"\n({s})")
+
+
+def biplots(X: pd.DataFrame, WX: Optional[pd.DataFrame]) -> pd.DataFrame:
+    """Biplots of data
+
+    :param X: Basis
+    :type X: pd.DataFrame
+    :param WX: Spatially Lagged Basis
+    :type WX: Optional[pd.DataFrame]
+    :return: Biplot and variance explained bar plot
+    :rtype: pd.DataFrame
+    """
+    if WX is not None:
+        F: pd.DataFrame = pd.concat([X, WX], axis=1)
+    else:
+        F: pd.DataFrame = X
+
+    pca: Pipeline = Pipeline([("scale", StandardScaler()), ("pca", PCA())])
+    pca.fit(F)
+
+    explained_variance: pd.Series = pd.Series(
+        pca.named_steps["pca"].explained_variance_ratio_
+    ).hvplot.bar(title="Explained Variance Ratio")
+
+    first, second = map(
+        lambda s: "(" + str(s) + "%)",
+        np.round(pca.named_steps["pca"].explained_variance_ratio_[:2] * 100, 2),
+    )
+
+    biplot: pd.DataFrame = (
+        pd.DataFrame(
+            pca.named_steps["pca"].components_, index=F.columns.str.replace("_", " ")
+        )
+        .rename(columns=lambda s: "Component " + str(s + 1))
+        .reset_index()
+        .hvplot.labels(
+            x="Component 1",
+            xlabel="Component 1 " + first,
+            y="Component 1",
+            ylabel="Component 2 " + second,
+            text="index",
+            text_baseline="top",
+            width=800,
+            height=600,
+            title="Spatial Lag Explanatory Biplot",
+            hover=False,
+        )
+    )
+
+    return biplot, explained_variance

@@ -33,12 +33,24 @@ Delete this when you start working on your own Kedro project.
 """
 
 from kedro.pipeline import Pipeline, node
-from .nodes import get_spatial_weights, get_slx_basis, backwards_selection
+from .nodes import (
+    get_spatial_weights,
+    get_slx_basis,
+    backwards_selection,
+    pearson_corr,
+    biplots,
+)
 
 
 def create_pipeline(**kwargs):
     return Pipeline(
         [
+            node(
+                pearson_corr,
+                ["X", "X"],
+                "nonspatialpearson",
+                tags=["pearson", "local"],
+            ),
             node(
                 get_spatial_weights,
                 ["X", "y", "D"],
@@ -56,6 +68,24 @@ def create_pipeline(**kwargs):
                 ["X", "W", "params:drop_features"],
                 "WX",
                 tags=["slx", "local"],
+            ),
+            node(
+                pearson_corr,
+                ["X", "WX"],
+                "nonspatialspatialpearson",
+                tags=["pearson", "local"],
+            ),
+            node(
+                pearson_corr,
+                ["WX", "WX"],
+                "spatialpearson",
+                tags=["pearson", "local"],
+            ),
+            node(
+                biplots,
+                ["X", "WX"],
+                ["biplot", "explained_variance"],
+                tags=["biplot", "local"],
             ),
             node(
                 backwards_selection,
