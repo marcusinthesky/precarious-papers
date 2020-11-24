@@ -61,7 +61,11 @@ def create_pipeline(**kwargs):
             node(
                 returns_weibull_gft,
                 ["W", "y"],
-                "returns_weibull_gft",
+                [
+                    "returns_weibull_gft",
+                    "top_magnitude_frequencies",
+                    "lowest_frequencies",
+                ],
                 tags=["gft", "local"],
             ),
             node(

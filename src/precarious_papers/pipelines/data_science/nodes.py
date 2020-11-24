@@ -26,19 +26,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # pylint: disable=invalid-name
-from typing import List, Optional
+from typing import List, Optional, Dict, Tuple
+from functools import reduce
+from operator import add
 
 import numpy as np
 import pandas as pd
-from scipy import stats
 import pysal as ps
-from sklearn.metrics import pairwise_distances
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
+from scipy import stats
+import networkx as nx
 import holoviews as hv
 import hvplot.pandas  # noqa
-
+import hvplot.networkx as hvnx
+from sklearn.decomposition import PCA
+from sklearn.metrics import pairwise_distances
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
 hv.extension("bokeh")
 
@@ -313,7 +316,42 @@ def biplots(X: pd.DataFrame, WX: Optional[pd.DataFrame]) -> pd.DataFrame:
     return biplot, explained_variance
 
 
-def returns_weibull_gft(W: pd.DataFrame, y: pd.DataFrame) -> hv.element.chart.Scatter:
+def mask(Q: np.ndarray, m: int = None) -> np.ndarray:
+    if m is not None:
+        z = np.zeros_like(Q)
+        z[m] = 1
+        return z
+    else:
+        return np.ones_like(Q)
+
+
+def get_graph(
+    graph: nx.Graph, vecs: np.ndarray, vals: np.ndarray, gft: np.ndarray, k: int = 0
+):
+    top_component: pd.Series = pd.Series((vecs @ (gft * mask(gft, k))).flatten())
+    pos: Dict = nx.kamada_kawai_layout(graph)
+
+    component: hv.Graph = hvnx.draw(
+        graph, pos, edge_width=hv.dim("weight") * 1, node_size=hv.dim("size") * 20
+    ).opts(
+        title=f"Eigenvector λ={np.round(vals[k], 3)} on Weibull Weighted Graph",
+        colorbar=True,
+    ) * hvnx.draw_networkx_nodes(
+        graph,
+        pos,
+        node_cmap="turbo",
+        node_size=80,
+        node_color=top_component.tolist(),
+        cmap="turbo",
+        colorbar=True,
+        logz=True,
+    )
+    return component
+
+
+def returns_weibull_gft(
+    W: pd.DataFrame, y: pd.DataFrame
+) -> Tuple[hv.element.chart.Scatter, hv.core.layout.Layout, hv.core.layout.Layout]:
 
     D: np.ndarray = np.diag(np.array(W.sum(0)).flatten(), 0)
     L: np.ndarray = D - W
@@ -337,4 +375,19 @@ def returns_weibull_gft(W: pd.DataFrame, y: pd.DataFrame) -> hv.element.chart.Sc
         color="darkblue",
     )
 
-    return returns_weibull_gft_plot
+    graph: nx.Graph = nx.from_pandas_adjacency(
+        W ** 0.125
+    )  # this is only to scale the layout
+
+    lowest = []
+    for k in range(6):
+        lowest.append(get_graph(graph, vecs, vals, gft, k))
+    lowest_components = reduce(add, lowest).cols(2)
+
+    arg_mags = np.argsort(np.abs(gft.flatten()))[::-1][:6]
+    highest = []
+    for k in arg_mags:
+        highest.append(get_graph(graph, vecs, vals, gft, k))
+    highest_components = reduce(add, highest).cols(2)
+
+    return returns_weibull_gft_plot, lowest_components, highest_components

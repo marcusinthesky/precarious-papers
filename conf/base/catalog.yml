@@ -183,10 +183,14 @@ spatialpearson:
 biplot:
   type: holoviews.HoloviewsWriter
   filepath: data/08_reporting/biplot.png
+  save_args:
+    dpi: 700
 
 explained_variance:
   type: holoviews.HoloviewsWriter
   filepath: data/08_reporting/explained_variance.png
+  save_args:
+    dpi: 700
 
 nonspatialresults:
   type: pandas.CSVDataSet
@@ -201,5 +205,17 @@ spatialresults:
 returns_weibull_gft:
   type: holoviews.HoloviewsWriter
   filepath: data/08_reporting/returns_weibull_gft.png
+  save_args:
+    dpi: 700
+
+top_magnitude_frequencies:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/top-magnitude-frequencies.png
+  save_args:
+    dpi: 700
+
+lowest_frequencies:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/lowest-frequencies.png
   save_args:
     dpi: 700
