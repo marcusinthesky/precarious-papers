@@ -39,6 +39,8 @@ from .nodes import (
     backwards_selection,
     pearson_corr,
     biplots,
+    returns_weibull_gft,
+    get_regression_diagnostics,
 )
 
 
@@ -58,10 +60,36 @@ def create_pipeline(**kwargs):
                 tags=["spatialweights", "local"],
             ),
             node(
+                returns_weibull_gft,
+                ["W", "y"],
+                [
+                    "returns_weibull_gft",
+                    "lowest_frequencies",
+                    "top_magnitude_frequencies",
+                ],
+                tags=["gft", "local"],
+            ),
+            node(
                 backwards_selection,
                 ["X", "y", "W"],
                 "nonspatialresults",
                 tags=["nonspatialmodel", "local"],
+            ),
+            node(
+                get_regression_diagnostics,
+                ["X", "y", "W", "params:ols", "params:drop_features"],
+                [
+                    "ols_leverage",
+                    "ols_cooks_distance",
+                    "ols_cooks_graph",
+                    "ols_pca_cooks",
+                    "ols_pca_explained",
+                    "ols_pca_clustered",
+                    "ols_clustered_graph",
+                    "ols_cluster_model",
+                    "ols_pca_model",
+                ],
+                tags=["nonspatialmodel", "nonspatialdiagnostics", "local"],
             ),
             node(
                 get_slx_basis,
@@ -92,6 +120,22 @@ def create_pipeline(**kwargs):
                 ["WX", "y", "W"],
                 "spatialresults",
                 tags=["spatialmodel", "local"],
+            ),
+            node(
+                get_regression_diagnostics,
+                ["WX", "y", "W", "params:slx"],
+                [
+                    "slx_leverage",
+                    "slx_cooks_distance",
+                    "slx_cooks_graph",
+                    "slx_pca_cooks",
+                    "slx_pca_explained",
+                    "slx_pca_clustered",
+                    "slx_clustered_graph",
+                    "slx_cluster_model",
+                    "slx_pca_model",
+                ],
+                tags=["spatialmodel", "spatialdiagnostics", "local"],
             ),
         ]
     )

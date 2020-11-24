@@ -16,6 +16,9 @@ window:
     start: -1
     end: 3
 
+slx: "SLX"
+ols: "Non-spatial"
+
 drop_features:
     - price_to_earnings
     - market_capitalization

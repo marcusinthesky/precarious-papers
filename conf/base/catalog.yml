@@ -183,10 +183,14 @@ spatialpearson:
 biplot:
   type: holoviews.HoloviewsWriter
   filepath: data/08_reporting/biplot.png
+  save_args:
+    dpi: 700
 
 explained_variance:
   type: holoviews.HoloviewsWriter
   filepath: data/08_reporting/explained_variance.png
+  save_args:
+    dpi: 700
 
 nonspatialresults:
   type: pandas.CSVDataSet
@@ -197,3 +201,117 @@ spatialresults:
   type: pandas.CSVDataSet
   filepath: data/08_reporting/spatialresults.csv
   versioned: True
+
+returns_weibull_gft:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/returns_weibull_gft.png
+  save_args:
+    dpi: 700
+
+top_magnitude_frequencies:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/top-magnitude-frequencies.png
+  save_args:
+    dpi: 700
+
+lowest_frequencies:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/lowest-frequencies.png
+  save_args:
+    dpi: 700
+
+slx_leverage:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/slx_leverage.png
+
+slx_cooks_distance:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/slx_cooks_distance.png
+  save_args:
+    dpi: 700
+
+slx_cooks_graph:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/slx_cooks_graph.png
+  save_args:
+    dpi: 700
+
+slx_pca_cooks:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/slx_pca_cooks.png
+  save_args:
+    dpi: 700
+
+slx_pca_explained:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/slx_pca_explained.png
+  save_args:
+    dpi: 700
+
+slx_clustered_graph:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/slx_clustered_graph.png
+  save_args:
+    dpi: 700
+
+slx_pca_clustered:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/slx_pca_clustered.png
+  save_args:
+    dpi: 700
+
+slx_cluster_model:
+  type: pickle.PickleDataSet
+  filepath: data/06_models/slx_cluster_model.pkl
+
+slx_pca_model:
+  type: pickle.PickleDataSet
+  filepath: data/06_models/slx_pca_model.pkl
+
+ols_leverage:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/ols_leverage.png
+
+ols_cooks_distance:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/ols_cooks_distance.png
+  save_args:
+    dpi: 700
+
+ols_cooks_graph:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/ols_cooks_graph.png
+  save_args:
+    dpi: 700
+
+ols_pca_cooks:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/ols_pca_cooks.png
+  save_args:
+    dpi: 700
+
+ols_pca_explained:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/ols_pca_explained.png
+  save_args:
+    dpi: 700
+
+ols_clustered_graph:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/ols_clustered_graph.png
+  save_args:
+    dpi: 700
+
+ols_pca_clustered:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/ols_pca_clustered.png
+  save_args:
+    dpi: 700
+
+ols_cluster_model:
+  type: pickle.PickleDataSet
+  filepath: data/06_models/ols_cluster_model.pkl
+
+ols_pca_model:
+  type: pickle.PickleDataSet
+  filepath: data/06_models/ols_pca_model.pkl

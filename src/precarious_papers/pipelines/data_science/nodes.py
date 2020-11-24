@@ -26,16 +26,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # pylint: disable=invalid-name
-from typing import List, Optional
+from functools import reduce
+from operator import add
+from typing import Dict, List, Optional, Tuple
 
+import holoviews as hv
+import hvplot.networkx as hvnx
+import hvplot.pandas  # noqa
+import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
 import pandas as pd
-from scipy import stats
 import pysal as ps
-from sklearn.metrics import pairwise_distances
+from scipy import stats
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import pairwise_distances
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import MeanShift
+from statsmodels.graphics.regressionplots import influence_plot
+from statsmodels.regression.linear_model import OLS, OLSResults
+
+hv.extension("bokeh")
 
 
 def get_spatial_statistics(spatial_model: ps.model.spreg.ols.OLS) -> pd.Series:
@@ -306,3 +318,209 @@ def biplots(X: pd.DataFrame, WX: Optional[pd.DataFrame]) -> pd.DataFrame:
     )
 
     return biplot, explained_variance
+
+
+def mask(Q: np.ndarray, m: int = None) -> np.ndarray:
+    if m is not None:
+        z = np.zeros_like(Q)
+        z[m] = 1
+        return z
+    else:
+        return np.ones_like(Q)
+
+
+def get_graph(
+    graph: nx.Graph, vecs: np.ndarray, vals: np.ndarray, gft: np.ndarray, k: int = 0
+):
+    top_component: pd.Series = pd.Series((vecs @ (gft * mask(gft, k))).flatten())
+    pos: Dict = nx.kamada_kawai_layout(graph)
+
+    component: hv.Graph = hvnx.draw(
+        graph, pos, edge_width=hv.dim("weight") * 1, node_size=hv.dim("size") * 20
+    ).opts(
+        title=f"Eigenvector λ={np.round(vals[k], 3)} on Weibull Weighted Graph",
+        colorbar=True,
+    ) * hvnx.draw_networkx_nodes(
+        graph,
+        pos,
+        node_cmap="turbo",
+        node_size=80,
+        node_color=top_component.tolist(),
+        cmap="turbo",
+        colorbar=True,
+        logz=True,
+    )
+    return component
+
+
+def returns_weibull_gft(
+    W: pd.DataFrame, y: pd.DataFrame
+) -> Tuple[hv.element.chart.Scatter, hv.core.layout.Layout, hv.core.layout.Layout]:
+
+    D: np.ndarray = np.diag(np.array(W.sum(0)).flatten(), 0)
+    L: np.ndarray = D - W
+
+    vals, vecs = np.linalg.eigh(L.to_numpy())
+
+    U, e = np.conjugate(vecs), vals  # noqa
+    gft: np.ndarray = np.tensordot(U, y, ([0], [0]))
+
+    true: pd.DataFrame = pd.DataFrame(
+        {"Eigenvalues (Frequency)": vals.real, "Magnitudes": np.abs(gft).flatten()}
+    )
+
+    returns_weibull_gft_plot: hv.element.chart.Scatter = true.hvplot.scatter(
+        x="Eigenvalues (Frequency)",
+        y="Magnitudes",
+        height=350,
+        width=750,
+        size=5,
+        logx=False,
+        color="darkblue",
+    )
+
+    graph: nx.Graph = nx.from_pandas_adjacency(
+        W ** 0.125
+    )  # this is only to scale the layout
+
+    lowest = []
+    for k in range(6):
+        lowest.append(get_graph(graph, vecs, vals, gft, k))
+    lowest_components = reduce(add, lowest).cols(2)
+
+    arg_mags = np.argsort(np.abs(gft.flatten()))[::-1][:6]
+    highest = []
+    for k in arg_mags:
+        highest.append(get_graph(graph, vecs, vals, gft, k))
+    highest_components = reduce(add, highest).cols(2)
+
+    return returns_weibull_gft_plot, lowest_components, highest_components
+
+
+def get_regression_diagnostics(
+    X: pd.DataFrame,
+    y: pd.DataFrame,
+    W: pd.DataFrame,
+    title: str = "OLS",
+    drop_features: Optional[List[str]] = None,
+) -> hv.Graph:
+    if drop_features is not None:
+        X: pd.DataFrame = X.drop(columns=drop_features)
+
+    graph: nx.Graph = nx.from_pandas_adjacency(
+        W ** 0.125
+    )  # this is only to scale the layout
+
+    ols: OLSResults = OLS(
+        y,
+        X.assign(alpha=1),
+    ).fit()
+
+    fig, ax = plt.subplots(figsize=(20, 10))
+    leverage: plt.Figure = influence_plot(ols, ax=ax)
+
+    outlier_results: Tuple[np.ndarray] = ols.get_influence().cooks_distance
+    cooks_distance = (
+        pd.Series(outlier_results[0], y.index)
+        .sort_values(ascending=False)
+        .hvplot.bar(width=1200, title=f"Cooks Distance {title} Model")
+        .opts(xrotation=90)
+    )
+
+    cooks_graph: hv.Graph = hvnx.draw_kamada_kawai(
+        graph,
+        node_cmap="turbo",
+        node_size=150,
+        node_color=outlier_results[0],
+        label=f"Cooks Distance of {title} Model over Graph",
+        cmap="turbo",
+        edge_width=hv.dim("weight") * 2.5,
+        colorbar=True,
+        #                            title='Cooks Distance',
+        height=600,
+        width=1000,
+        logz=True,
+    )
+
+    outlier_pca: Pipeline = Pipeline([("scale", StandardScaler()), ("pca", PCA())])
+    Z: pd.DataFrame = pd.DataFrame(outlier_pca.fit_transform(X), index=X.index)
+
+    pca_explained: pd.Series = pd.Series(
+        outlier_pca.named_steps["pca"].explained_variance_ratio_
+    ).hvplot.bar(
+        title=f"Variance Explained Ratio of Principal Components of {title} Explanatory Variables"
+    )
+
+    U: pd.DataFrame = pd.DataFrame(
+        outlier_pca.fit_transform(Z)[:, :2], index=X.index
+    ).rename(columns=lambda s: "Component " + str(s + 1))
+
+    first, second = map(
+        lambda s: "(" + str(s) + "%)",
+        np.round(outlier_pca.named_steps["pca"].explained_variance_ratio_[:2] * 100, 2),
+    )
+
+    U_cooks: pd.DataFrame = U.assign(**{"Cooks Distance": outlier_results[0]})
+
+    top_cooks: pd.Series = pd.Series(outlier_results[0], index=y.index).nlargest(3)
+
+    pca_cooks: hv.Graph = U_cooks.hvplot.scatter(
+        x="Component 1",
+        y="Component 2",
+        xlabel="Component 1 " + first,
+        ylabel="Component 2 " + second,
+        color="Cooks Distance",
+        cmap="turbo",
+        logz=True,
+        width=900,
+        height=500,
+        title=f"Principal Components of our {title} Model with Cooks Outliers",
+    ) * U_cooks.loc[top_cooks.index, :].reset_index().hvplot.labels(
+        x="Component 1",
+        y="Component 2",
+        text="symbol",
+        text_baseline="bottom",
+    )
+
+    cluster_pca: Pipeline = Pipeline(
+        [("scale", StandardScaler()), ("pca", PCA(2)), ("cluster", MeanShift())]
+    )
+    clusters = (cluster_pca.fit_predict(X) + 1).astype(int).astype(str)
+
+    pca_clustered: hv.Graph = U_cooks.assign(Cluster=clusters).hvplot.scatter(
+        x="Component 1",
+        y="Component 2",
+        xlabel="Component 1 " + first,
+        ylabel="Component 2 " + second,
+        color="Cluster",
+        logz=True,
+        width=900,
+        height=500,
+        title=f"Principal Components of our {title} Model with MeanShift Clusters",
+    )
+
+    clustered_graph: hv.Graph = hvnx.draw_kamada_kawai(
+        graph,
+        node_cmap="turbo",
+        node_size=150,
+        node_color=clusters,
+        label=f"Cooks Distance of {title} Model over Graph",
+        edge_width=hv.dim("weight") * 2.5,
+        colorbar=True,
+        title=f"Mean Shift Clustering on Principle Components of {title} Model over Graph",
+        height=600,
+        width=1000,
+        logz=True,
+    )
+
+    return (
+        leverage,
+        cooks_distance,
+        cooks_graph,
+        pca_cooks,
+        pca_explained,
+        pca_clustered,
+        clustered_graph,
+        outlier_pca,
+        cluster_pca,
+    )
