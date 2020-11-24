@@ -40,6 +40,7 @@ from .nodes import (
     pearson_corr,
     biplots,
     returns_weibull_gft,
+    get_regression_diagnostics,
 )
 
 
@@ -63,8 +64,8 @@ def create_pipeline(**kwargs):
                 ["W", "y"],
                 [
                     "returns_weibull_gft",
-                    "top_magnitude_frequencies",
                     "lowest_frequencies",
+                    "top_magnitude_frequencies",
                 ],
                 tags=["gft", "local"],
             ),
@@ -73,6 +74,18 @@ def create_pipeline(**kwargs):
                 ["X", "y", "W"],
                 "nonspatialresults",
                 tags=["nonspatialmodel", "local"],
+            ),
+            node(
+                get_regression_diagnostics,
+                ["X", "y", "W", "params:ols"],
+                [
+                    "ols_leverage",
+                    "ols_cooks_distance",
+                    "ols_cooks_graph",
+                    "ols_pca_cooks",
+                    "ols_pca_explained",
+                ],
+                tags=["nonspatialmodel", "nonspatialdiagnostics", "local"],
             ),
             node(
                 get_slx_basis,
@@ -103,6 +116,18 @@ def create_pipeline(**kwargs):
                 ["WX", "y", "W"],
                 "spatialresults",
                 tags=["spatialmodel", "local"],
+            ),
+            node(
+                get_regression_diagnostics,
+                ["WX", "y", "W", "params:slx"],
+                [
+                    "slx_leverage",
+                    "slx_cooks_distance",
+                    "slx_cooks_graph",
+                    "slx_pca_cooks",
+                    "slx_pca_explained",
+                ],
+                tags=["spatialmodel", "spatialdiagnostics", "local"],
             ),
         ]
     )

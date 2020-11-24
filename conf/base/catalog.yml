@@ -219,3 +219,59 @@ lowest_frequencies:
   filepath: data/08_reporting/lowest-frequencies.png
   save_args:
     dpi: 700
+
+slx_leverage:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/slx_leverage.png
+
+slx_cooks_distance:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/slx_cooks_distance.png
+  save_args:
+    dpi: 700
+
+slx_cooks_graph:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/slx_cooks_graph.png
+  save_args:
+    dpi: 700
+
+slx_pca_cooks:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/slx_pca_cooks.png
+  save_args:
+    dpi: 700
+
+slx_pca_explained:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/slx_pca_explained.png
+  save_args:
+    dpi: 700
+
+ols_leverage:
+  type: matplotlib.MatplotlibWriter
+  filepath: data/08_reporting/ols_leverage.png
+
+ols_cooks_distance:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/ols_cooks_distance.png
+  save_args:
+    dpi: 700
+
+ols_cooks_graph:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/ols_cooks_graph.png
+  save_args:
+    dpi: 700
+
+ols_pca_cooks:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/ols_pca_cooks.png
+  save_args:
+    dpi: 700
+
+ols_pca_explained:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/ols_pca_explained.png
+  save_args:
+    dpi: 700

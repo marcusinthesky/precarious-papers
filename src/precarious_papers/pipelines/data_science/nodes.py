@@ -26,22 +26,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # pylint: disable=invalid-name
-from typing import List, Optional, Dict, Tuple
 from functools import reduce
 from operator import add
+from typing import Dict, List, Optional, Tuple
 
+import holoviews as hv
+import hvplot.networkx as hvnx
+import hvplot.pandas  # noqa
+import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
 import pandas as pd
 import pysal as ps
 from scipy import stats
-import networkx as nx
-import holoviews as hv
-import hvplot.pandas  # noqa
-import hvplot.networkx as hvnx
 from sklearn.decomposition import PCA
 from sklearn.metrics import pairwise_distances
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from statsmodels.graphics.regressionplots import influence_plot
+from statsmodels.regression.linear_model import OLS, OLSResults
 
 hv.extension("bokeh")
 
@@ -391,3 +394,91 @@ def returns_weibull_gft(
     highest_components = reduce(add, highest).cols(2)
 
     return returns_weibull_gft_plot, lowest_components, highest_components
+
+
+def get_regression_diagnostics(
+    X: pd.DataFrame,
+    y: pd.DataFrame,
+    W: pd.DataFrame,
+    title: str = "OLS",
+    drop_features: Optional[List[str]] = None,
+) -> hv.Graph:
+    if drop_features is not None:
+        X: pd.DataFrame = X.drop(columns=drop_features)
+
+    graph: nx.Graph = nx.from_pandas_adjacency(
+        W ** 0.125
+    )  # this is only to scale the layout
+
+    ols: OLSResults = OLS(
+        y,
+        X.assign(alpha=1),
+    ).fit()
+
+    fig, ax = plt.subplots(figsize=(20, 10))
+    leverage: plt.Figure = influence_plot(ols, ax=ax)
+
+    outlier_results: Tuple[np.ndarray] = ols.get_influence().cooks_distance
+    cooks_distance = (
+        pd.Series(outlier_results[0], y.index)
+        .sort_values(ascending=False)
+        .hvplot.bar(width=1200, title=f"Cooks Distance {title} Model")
+        .opts(xrotation=90)
+    )
+
+    cooks_graph: hv.Graph = hvnx.draw_kamada_kawai(
+        graph,
+        node_cmap="turbo",
+        node_size=150,
+        node_color=outlier_results[0],
+        label=f"Cooks Distance of {title} Model over Graph",
+        cmap="turbo",
+        edge_width=hv.dim("weight") * 2.5,
+        colorbar=True,
+        #                            title='Cooks Distance',
+        height=600,
+        width=1000,
+        logz=True,
+    )
+
+    outlier_pca: Pipeline = Pipeline([("scale", StandardScaler()), ("pca", PCA())])
+    Z: pd.DataFrame = pd.DataFrame(outlier_pca.fit_transform(X), index=X.index)
+
+    pca_explained: pd.Series = pd.Series(
+        outlier_pca.named_steps["pca"].explained_variance_ratio_
+    ).hvplot.bar(
+        title=f"Variance Explained Ratio of Principal Components of {title} Explanatory Variables"
+    )
+
+    U: pd.DataFrame = pd.DataFrame(
+        outlier_pca.fit_transform(Z)[:, :2], index=X.index
+    ).rename(columns=lambda s: "Component " + str(s + 1))
+
+    first, second = map(
+        lambda s: "(" + str(s) + "%)",
+        np.round(outlier_pca.named_steps["pca"].explained_variance_ratio_[:2] * 100, 2),
+    )
+
+    U_cooks: pd.DataFrame = U.assign(**{"Cooks Distance": outlier_results[0]})
+
+    top_cooks: pd.Series = pd.Series(outlier_results[0], index=y.index).nlargest(3)
+
+    pca_cooks: hv.Graph = U_cooks.hvplot.scatter(
+        x="Component 1",
+        y="Component 2",
+        xlabel="Component 1 " + first,
+        ylabel="Component 2 " + second,
+        color="Cooks Distance",
+        cmap="turbo",
+        logz=True,
+        width=900,
+        height=500,
+        title=f"Principal Components of our {title} Model with Cooks Outliers",
+    ) * U_cooks.loc[top_cooks.index, :].reset_index().hvplot.labels(
+        x="Component 1",
+        y="Component 2",
+        text="symbol",
+        text_baseline="bottom",
+    )
+
+    return leverage, cooks_distance, cooks_graph, pca_cooks, pca_explained
