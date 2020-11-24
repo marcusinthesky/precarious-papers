@@ -248,6 +248,26 @@ slx_pca_explained:
   save_args:
     dpi: 700
 
+slx_clustered_graph:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/slx_clustered_graph.png
+  save_args:
+    dpi: 700
+
+slx_pca_clustered:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/slx_pca_clustered.png
+  save_args:
+    dpi: 700
+
+slx_cluster_model:
+  type: pickle.PickleDataSet
+  filepath: data/06_models/slx_cluster_model.pkl
+
+slx_pca_model:
+  type: pickle.PickleDataSet
+  filepath: data/06_models/slx_pca_model.pkl
+
 ols_leverage:
   type: matplotlib.MatplotlibWriter
   filepath: data/08_reporting/ols_leverage.png
@@ -275,3 +295,23 @@ ols_pca_explained:
   filepath: data/08_reporting/ols_pca_explained.png
   save_args:
     dpi: 700
+
+ols_clustered_graph:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/ols_clustered_graph.png
+  save_args:
+    dpi: 700
+
+ols_pca_clustered:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/ols_pca_clustered.png
+  save_args:
+    dpi: 700
+
+ols_cluster_model:
+  type: pickle.PickleDataSet
+  filepath: data/06_models/ols_cluster_model.pkl
+
+ols_pca_model:
+  type: pickle.PickleDataSet
+  filepath: data/06_models/ols_pca_model.pkl

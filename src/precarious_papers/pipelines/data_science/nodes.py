@@ -43,6 +43,7 @@ from sklearn.decomposition import PCA
 from sklearn.metrics import pairwise_distances
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import MeanShift
 from statsmodels.graphics.regressionplots import influence_plot
 from statsmodels.regression.linear_model import OLS, OLSResults
 
@@ -481,4 +482,45 @@ def get_regression_diagnostics(
         text_baseline="bottom",
     )
 
-    return leverage, cooks_distance, cooks_graph, pca_cooks, pca_explained
+    cluster_pca: Pipeline = Pipeline(
+        [("scale", StandardScaler()), ("pca", PCA(2)), ("cluster", MeanShift())]
+    )
+    clusters = (cluster_pca.fit_predict(X) + 1).astype(int).astype(str)
+
+    pca_clustered: hv.Graph = U_cooks.assign(Cluster=clusters).hvplot.scatter(
+        x="Component 1",
+        y="Component 2",
+        xlabel="Component 1 " + first,
+        ylabel="Component 2 " + second,
+        color="Cluster",
+        logz=True,
+        width=900,
+        height=500,
+        title=f"Principal Components of our {title} Model with MeanShift Clusters",
+    )
+
+    clustered_graph: hv.Graph = hvnx.draw_kamada_kawai(
+        graph,
+        node_cmap="turbo",
+        node_size=150,
+        node_color=clusters,
+        label=f"Cooks Distance of {title} Model over Graph",
+        edge_width=hv.dim("weight") * 2.5,
+        colorbar=True,
+        title=f"Mean Shift Clustering on Principle Components of {title} Model over Graph",
+        height=600,
+        width=1000,
+        logz=True,
+    )
+
+    return (
+        leverage,
+        cooks_distance,
+        cooks_graph,
+        pca_cooks,
+        pca_explained,
+        pca_clustered,
+        clustered_graph,
+        outlier_pca,
+        cluster_pca,
+    )
