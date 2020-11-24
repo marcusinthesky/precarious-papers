@@ -36,6 +36,11 @@ from sklearn.metrics import pairwise_distances
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
+import holoviews as hv
+import hvplot.pandas  # noqa
+
+
+hv.extension("bokeh")
 
 
 def get_spatial_statistics(spatial_model: ps.model.spreg.ols.OLS) -> pd.Series:
@@ -306,3 +311,30 @@ def biplots(X: pd.DataFrame, WX: Optional[pd.DataFrame]) -> pd.DataFrame:
     )
 
     return biplot, explained_variance
+
+
+def returns_weibull_gft(W: pd.DataFrame, y: pd.DataFrame) -> hv.element.chart.Scatter:
+
+    D: np.ndarray = np.diag(np.array(W.sum(0)).flatten(), 0)
+    L: np.ndarray = D - W
+
+    vals, vecs = np.linalg.eigh(L.to_numpy())
+
+    U, e = np.conjugate(vecs), vals  # noqa
+    gft: np.ndarray = np.tensordot(U, y, ([0], [0]))
+
+    true: pd.DataFrame = pd.DataFrame(
+        {"Eigenvalues (Frequency)": vals.real, "Magnitudes": np.abs(gft).flatten()}
+    )
+
+    returns_weibull_gft_plot: hv.element.chart.Scatter = true.hvplot.scatter(
+        x="Eigenvalues (Frequency)",
+        y="Magnitudes",
+        height=350,
+        width=750,
+        size=5,
+        logx=False,
+        color="darkblue",
+    )
+
+    return returns_weibull_gft_plot

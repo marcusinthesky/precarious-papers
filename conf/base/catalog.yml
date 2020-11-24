@@ -197,3 +197,9 @@ spatialresults:
   type: pandas.CSVDataSet
   filepath: data/08_reporting/spatialresults.csv
   versioned: True
+
+returns_weibull_gft:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/returns_weibull_gft.png
+  save_args:
+    dpi: 700

@@ -39,6 +39,7 @@ from .nodes import (
     backwards_selection,
     pearson_corr,
     biplots,
+    returns_weibull_gft,
 )
 
 
@@ -56,6 +57,12 @@ def create_pipeline(**kwargs):
                 ["X", "y", "D"],
                 "W",
                 tags=["spatialweights", "local"],
+            ),
+            node(
+                returns_weibull_gft,
+                ["W", "y"],
+                "returns_weibull_gft",
+                tags=["gft", "local"],
             ),
             node(
                 backwards_selection,
