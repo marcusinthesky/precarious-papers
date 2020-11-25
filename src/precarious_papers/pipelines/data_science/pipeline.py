@@ -89,7 +89,7 @@ def create_pipeline(**kwargs):
                     "ols_cluster_model",
                     "ols_pca_model",
                 ],
-                tags=["nonspatialmodel", "nonspatialdiagnostics", "local"],
+                tags=["nonspatialdiagnostics", "local"],
             ),
             node(
                 get_slx_basis,
