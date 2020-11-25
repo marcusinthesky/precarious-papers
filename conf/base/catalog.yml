@@ -315,3 +315,15 @@ ols_cluster_model:
 ols_pca_model:
   type: pickle.PickleDataSet
   filepath: data/06_models/ols_pca_model.pkl
+
+graph_fourier_listed:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/graph_fourier_listed.png
+  save_args:
+    dpi: 700
+
+graph_fourier_simulation:
+  type: holoviews.HoloviewsWriter
+  filepath: data/08_reporting/graph_fourier_simulation.png
+  save_args:
+    dpi: 700

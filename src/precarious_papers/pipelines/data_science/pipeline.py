@@ -41,12 +41,24 @@ from .nodes import (
     biplots,
     returns_weibull_gft,
     get_regression_diagnostics,
+    gft_simulation,
 )
 
 
 def create_pipeline(**kwargs):
     return Pipeline(
         [
+            node(
+                gft_simulation,
+                [
+                    "paradise_graph",
+                    "iex_matched_entities",
+                    "params:n_components",
+                    "params:samples",
+                ],
+                ["graph_fourier_listed", "graph_fourier_simulation"],
+                tags=["local", "simulation"],
+            ),
             node(
                 pearson_corr,
                 ["X", "X"],
@@ -104,10 +116,7 @@ def create_pipeline(**kwargs):
                 tags=["pearson", "local"],
             ),
             node(
-                pearson_corr,
-                ["WX", "WX"],
-                "spatialpearson",
-                tags=["pearson", "local"],
+                pearson_corr, ["WX", "WX"], "spatialpearson", tags=["pearson", "local"],
             ),
             node(
                 biplots,
