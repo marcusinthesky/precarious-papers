@@ -5,24 +5,24 @@
 <!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
 <head>
   <meta charset="utf-8">
-  
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+
   <title>precarious_papers.pipelines.data_science package &mdash; precarious_papers 0.1 documentation</title>
-  
 
-  
-  
-  
-  
 
-  
 
-  
-  
-    
 
-  
+
+
+
+
+
+
+
+
+
+
 
   <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
@@ -32,41 +32,41 @@
   <link rel="stylesheet" href="/home/marcussky/anaconda3/envs/precariouspapers/lib/python3.8/site-packages/kedro/framework/html/_static/css/theme-overrides.css" type="text/css" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="prev" title="precarious_papers.pipelines.data_engineering package" href="precarious_papers.pipelines.data_engineering.html" /> 
+    <link rel="prev" title="precarious_papers.pipelines.data_engineering package" href="precarious_papers.pipelines.data_engineering.html" />
 
-  
+
   <script src="_static/js/modernizr.min.js"></script>
 
 </head>
 
 <body class="wy-body-for-nav">
 
-   
+
   <div class="wy-grid-for-nav">
 
-    
+
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search">
-          
 
-          
+
+
             <a href="index.html" class="icon icon-home"> precarious_papers
-          
 
-          
+
+
           </a>
 
-          
-            
-            
+
+
+
               <div class="version">
                 0.1
               </div>
-            
-          
 
-          
+
+
+
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
     <input type="text" name="q" placeholder="Search docs" />
@@ -75,16 +75,16 @@
   </form>
 </div>
 
-          
+
         </div>
 
         <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
+
+
+
+
+
+
               <ul class="current">
 <li class="toctree-l1 current"><a class="reference internal" href="modules.html">precarious_papers</a><ul class="current">
 <li class="toctree-l2 current"><a class="reference internal" href="precarious_papers.html">precarious_papers package</a><ul class="current">
@@ -103,28 +103,28 @@
 </li>
 </ul>
 
-            
-          
+
+
         </div>
       </div>
     </nav>
 
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
 
-      
+
       <nav class="wy-nav-top" aria-label="top navigation">
-        
+
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="index.html">precarious_papers</a>
-        
+
       </nav>
 
 
       <div class="wy-nav-content">
-        
+
         <div class="rst-content style-external-links">
-        
-          
+
+
 
 
 
@@ -143,33 +143,33 @@
 <div role="navigation" aria-label="breadcrumbs navigation">
 
   <ul class="wy-breadcrumbs">
-    
+
       <li><a href="index.html">Docs</a> &raquo;</li>
-        
+
           <li><a href="modules.html">precarious_papers</a> &raquo;</li>
-        
+
           <li><a href="precarious_papers.html">precarious_papers package</a> &raquo;</li>
-        
+
           <li><a href="precarious_papers.pipelines.html">precarious_papers.pipelines package</a> &raquo;</li>
-        
+
       <li>precarious_papers.pipelines.data_science package</li>
-    
-    
+
+
       <li class="wy-breadcrumbs-aside">
-        
-            
-        
+
+
+
       </li>
-    
+
   </ul>
 
-  
+
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-            
-  
+
+
 <style>
 /* CSS overrides for sphinx_rtd_theme */
 
@@ -439,6 +439,24 @@ defaults to [“price_to_earnings”, “market_capitalization”, “centrality
 </table>
 </dd></dl>
 
+<dl class="function">
+<dt id="precarious_papers.pipelines.data_science.nodes.variance_inflation_factors">
+<code class="descclassname">precarious_papers.pipelines.data_science.nodes.</code><code class="descname">variance_inflation_factors</code><span class="sig-paren">(</span><em>exog_df</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/precarious_papers/pipelines/data_science/nodes.html#variance_inflation_factors"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#precarious_papers.pipelines.data_science.nodes.variance_inflation_factors" title="Permalink to this definition">¶</a></dt>
+<dd><p>Computes Variable Inflation Factors for given Exogenous variables</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>exog_df</strong> (<em>pd.DataFrame</em>) – Basis</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">Computed VIFs</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body">pd.Series</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
 </div>
 <div class="section" id="module-precarious_papers.pipelines.data_science.pipeline">
 <span id="precarious-papers-pipelines-data-science-pipeline-module"></span><h2>precarious_papers.pipelines.data_science.pipeline module<a class="headerlink" href="#module-precarious_papers.pipelines.data_science.pipeline" title="Permalink to this headline">¶</a></h2>
@@ -455,17 +473,17 @@ just for illustrating basic Kedro features.</p>
 
 
            </div>
-           
+
           </div>
           <footer>
-  
+
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-      
+
+
         <a href="precarious_papers.pipelines.data_engineering.html" class="btn btn-neutral" title="precarious_papers.pipelines.data_engineering package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
+
     </div>
-  
+
 
   <hr/>
 
@@ -475,7 +493,7 @@ just for illustrating basic Kedro features.</p>
 
     </p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
 
 </footer>
 
@@ -485,10 +503,10 @@ just for illustrating basic Kedro features.</p>
     </section>
 
   </div>
-  
 
 
-  
+
+
 
     <script type="text/javascript">
         var DOCUMENTATION_OPTIONS = {
@@ -508,7 +526,7 @@ just for illustrating basic Kedro features.</p>
       <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.0/clipboard.min.js"></script>
       <script type="text/javascript" src="_static/copybutton.js"></script>
 
-  
+
 
   <script type="text/javascript" src="_static/js/theme.js"></script>
 
@@ -516,7 +534,7 @@ just for illustrating basic Kedro features.</p>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script> 
+  </script>
 
 </body>
 </html>

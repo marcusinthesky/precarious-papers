@@ -39,15 +39,45 @@ import numpy as np
 import pandas as pd
 import pysal as ps
 from scipy import stats
+from sklearn.cluster import MeanShift
 from sklearn.decomposition import PCA
 from sklearn.metrics import pairwise_distances
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.cluster import MeanShift
 from statsmodels.graphics.regressionplots import influence_plot
 from statsmodels.regression.linear_model import OLS, OLSResults
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+from statsmodels.tools.tools import add_constant
 
 hv.extension("bokeh")
+
+
+def variance_inflation_factors(exog_df: pd.DataFrame) -> pd.Series:
+    """Computes Variable Inflation Factors for given Exogenous variables
+
+    :param exog_df: Basis
+    :type exog_df: pd.DataFrame
+    :return: Computed VIFs
+    :rtype: pd.Series
+    """
+    exog_df: pd.DataFrame = add_constant(exog_df)
+    vifs: pd.Series = pd.Series(
+        [
+            1
+            / (
+                1.0
+                - OLS(
+                    exog_df[col].values, exog_df.loc[:, exog_df.columns != col].values
+                )
+                .fit()
+                .rsquared
+            )
+            for col in exog_df
+        ],
+        index=exog_df.columns,
+        name="VIF",
+    )
+    return vifs
 
 
 def get_spatial_statistics(spatial_model: ps.model.spreg.ols.OLS) -> pd.Series:
@@ -113,9 +143,12 @@ def backwards_selection(
     """
     w: ps.lib.weights.weights.W = ps.lib.weights.full2W(W.to_numpy())
 
+    vifs: List = []
     coefficients: List = []
     statistics: List = []
     for i in range(X.shape[1]):
+
+        vifs.append(variance_inflation_factors(X).drop("const").to_frame(i).T)
 
         spatial_model: ps.model.spreg.ols.OLS = ps.model.spreg.OLS(
             y.to_numpy(),
@@ -159,13 +192,17 @@ def backwards_selection(
 
         X = X.drop(columns=[least_significant])
 
+    v: pd.DataFrame = pd.concat(vifs, axis=0).round(4).fillna("").T
     c: pd.DataFrame = pd.concat(coefficients, axis=1).fillna("")
     c: pd.DataFrame = c.loc[c.eq("").sum(1).sort_values(ascending=False).index, :]
 
     s: pd.DataFrame = pd.concat(statistics, axis=1).fillna("")
 
     return (
-        pd.concat([c, s]).reset_index().rename(columns={"index": "Estimate"}).fillna("")
+        pd.concat([v, c, s])
+        .reset_index()
+        .rename(columns={"index": "Estimate"})
+        .fillna("")
     )
 
 
