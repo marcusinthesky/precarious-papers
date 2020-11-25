@@ -368,6 +368,31 @@ defaults to [“price_to_earnings”, “market_capitalization”, “centrality
 </dd></dl>
 
 <dl class="function">
+<dt id="precarious_papers.pipelines.data_science.nodes.gft_simulation">
+<code class="descclassname">precarious_papers.pipelines.data_science.nodes.</code><code class="descname">gft_simulation</code><span class="sig-paren">(</span><em>paradise_graph</em>, <em>matched_entities</em>, <em>n_components=400</em>, <em>samples=1000</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/precarious_papers/pipelines/data_science/nodes.html#gft_simulation"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#precarious_papers.pipelines.data_science.nodes.gft_simulation" title="Permalink to this definition">¶</a></dt>
+<dd><p>Produces plots to compare gft of listed companies of the graph to randomly positioned companies</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>paradise_graph</strong> (<em>nx.Graph</em>) – NetworkX graph of al paradise papers entities</li>
+<li><strong>matched_entities</strong> (<em>pd.DataFrame</em>) – matched entities of listed companies and node_id’s</li>
+<li><strong>n_components</strong> (<em>int</em><em>, </em><em>optional</em>) – number of components to compute of gft, defaults to 400</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first">plots of gft and simulation</p>
+</td>
+</tr>
+<tr class="field-odd field"><th class="field-name">Return type:</th><td class="field-body"><p class="first last">Tuple[hv.Graph]</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
 <dt id="precarious_papers.pipelines.data_science.nodes.mask">
 <code class="descclassname">precarious_papers.pipelines.data_science.nodes.</code><code class="descname">mask</code><span class="sig-paren">(</span><em>Q</em>, <em>m=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/precarious_papers/pipelines/data_science/nodes.html#mask"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#precarious_papers.pipelines.data_science.nodes.mask" title="Permalink to this definition">¶</a></dt>
 <dd><p>Create mask at particular index</p>

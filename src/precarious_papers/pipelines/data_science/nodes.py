@@ -39,6 +39,8 @@ import numpy as np
 import pandas as pd
 import pysal as ps
 from scipy import stats
+from scipy.sparse import csr_matrix, diags
+from scipy.sparse.linalg import eigsh
 from sklearn.cluster import MeanShift
 from sklearn.decomposition import PCA
 from sklearn.metrics import pairwise_distances
@@ -495,10 +497,7 @@ def get_regression_diagnostics(
         W ** 0.125
     )  # this is only to scale the layout
 
-    ols: OLSResults = OLS(
-        y,
-        X.assign(alpha=1),
-    ).fit()
+    ols: OLSResults = OLS(y, X.assign(alpha=1),).fit()
 
     fig, ax = plt.subplots(figsize=(20, 10))
     leverage: plt.Figure = influence_plot(ols, ax=ax)
@@ -560,10 +559,7 @@ def get_regression_diagnostics(
         height=500,
         title=f"Principal Components of our {title} Model with Cooks Outliers",
     ) * U_cooks.loc[top_cooks.index, :].reset_index().hvplot.labels(
-        x="Component 1",
-        y="Component 2",
-        text="symbol",
-        text_baseline="bottom",
+        x="Component 1", y="Component 2", text="symbol", text_baseline="bottom",
     )
 
     cluster_pca: Pipeline = Pipeline(
@@ -585,12 +581,10 @@ def get_regression_diagnostics(
 
     clustered_graph: hv.Graph = hvnx.draw_kamada_kawai(
         graph,
-        node_cmap="turbo",
         node_size=150,
+        cmap="Category10",
         node_color=clusters,
-        label=f"Cooks Distance of {title} Model over Graph",
         edge_width=hv.dim("weight") * 2.5,
-        colorbar=True,
         title=f"Mean Shift Clustering on Principle Components of {title} Model over Graph",
         height=600,
         width=1000,
@@ -608,3 +602,82 @@ def get_regression_diagnostics(
         outlier_pca,
         cluster_pca,
     )
+
+
+def gft_simulation(
+    paradise_graph: nx.Graph,
+    matched_entities: pd.DataFrame,
+    n_components: int = 400,
+    samples: int = 1000,
+) -> Tuple[hv.Graph]:
+    """Produces plots to compare gft of listed companies of the graph to randomly positioned companies
+
+    :param paradise_graph: NetworkX graph of al paradise papers entities
+    :type paradise_graph: nx.Graph
+    :param matched_entities: matched entities of listed companies and node_id's
+    :type matched_entities: pd.DataFrame
+    :param n_components: number of components to compute of gft, defaults to 400
+    :type n_components: int, optional
+    :return: plots of gft and simulation
+    :rtype: Tuple[hv.Graph]
+    """
+    A: csr_matrix = nx.to_scipy_sparse_matrix(paradise_graph).asfptype()
+    D: csr_matrix = diags(np.array(A.sum(0)).flatten(), 0)
+    L: csr_matrix = (D - A).astype("f")
+
+    vals, vecs = eigsh(L, k=n_components)
+    U, e = np.conjugate(vecs), vals
+
+    membership = np.array(
+        [
+            1 if f in matched_entities.node_id.tolist() else 0
+            for f in list(paradise_graph.nodes)
+        ]
+    ).reshape((-1, 1))
+
+    gft = np.tensordot(U, membership, ([0], [0]))
+    true = pd.DataFrame(
+        {"Eigenvalues (Frequency)": vals.real, "Magnitudes": np.abs(gft).flatten()}
+    )
+
+    true_plot = true.hvplot.scatter(
+        x="Eigenvalues (Frequency)",
+        y="Magnitudes",
+        height=200,
+        width=400,
+        size=5,
+        logx=True,
+        color="orange",
+    )
+
+    signal = membership.copy()
+
+    R = np.ones((samples, U.shape[1]))
+    for i in range(10):
+        pd.np.random.shuffle(signal)
+        rgft = np.tensordot(U, signal, ([0], [0]))
+        R[i, :] = np.abs(rgft).flatten()
+
+    simulated = pd.DataFrame(R.T).assign(**{"Eigenvalues (Frequency)": vals.real}).melt(
+        id_vars="Eigenvalues (Frequency)", value_name="Magnitudes"
+    ).hvplot.scatter(
+        x="Eigenvalues (Frequency)",
+        y="Magnitudes",
+        color="blue",
+        label="Simualted",
+        height=200,
+        width=400,
+        alpha=0.25,
+        size=1,
+    ) * true.hvplot.scatter(
+        x="Eigenvalues (Frequency)",
+        y="Magnitudes",
+        height=200,
+        width=400,
+        logx=True,
+        alpha=0.5,
+        size=5,
+        label="Observed",
+    )
+
+    return true_plot, simulated
