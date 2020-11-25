@@ -123,7 +123,7 @@ def create_pipeline(**kwargs):
             ),
             node(
                 get_regression_diagnostics,
-                ["WX", "y", "W", "params:slx"],
+                ["WX", "y", "W", "params:slx", "params:drop_slx_features"],
                 [
                     "slx_leverage",
                     "slx_cooks_distance",
