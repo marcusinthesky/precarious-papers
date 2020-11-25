@@ -497,7 +497,10 @@ def get_regression_diagnostics(
         W ** 0.125
     )  # this is only to scale the layout
 
-    ols: OLSResults = OLS(y, X.assign(alpha=1),).fit()
+    ols: OLSResults = OLS(
+        y,
+        X.assign(alpha=1),
+    ).fit()
 
     fig, ax = plt.subplots(figsize=(20, 10))
     leverage: plt.Figure = influence_plot(ols, ax=ax)
@@ -559,7 +562,10 @@ def get_regression_diagnostics(
         height=500,
         title=f"Principal Components of our {title} Model with Cooks Outliers",
     ) * U_cooks.loc[top_cooks.index, :].reset_index().hvplot.labels(
-        x="Component 1", y="Component 2", text="symbol", text_baseline="bottom",
+        x="Component 1",
+        y="Component 2",
+        text="symbol",
+        text_baseline="bottom",
     )
 
     cluster_pca: Pipeline = Pipeline(
