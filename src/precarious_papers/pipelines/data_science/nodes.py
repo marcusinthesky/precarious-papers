@@ -321,13 +321,13 @@ def biplots(X: pd.DataFrame, WX: Optional[pd.DataFrame]) -> pd.DataFrame:
 
 
 def mask(Q: np.ndarray, m: int = None) -> np.ndarray:
-    """[summary]
+    """Create mask at particular index
 
-    :param Q: [description]
+    :param Q: Matrix for which mask is begin produces
     :type Q: np.ndarray
-    :param m: [description], defaults to None
+    :param m: Index at which to produce mask, defaults to None
     :type m: int, optional
-    :return: [description]
+    :return: Mask matrix
     :rtype: np.ndarray
     """
     if m is not None:
