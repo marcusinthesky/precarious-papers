@@ -23,3 +23,6 @@ drop_features:
     - price_to_earnings
     - market_capitalization
     - centrality
+
+drop_slx_features:
+    - W_rm

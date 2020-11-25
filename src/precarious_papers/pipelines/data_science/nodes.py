@@ -321,6 +321,15 @@ def biplots(X: pd.DataFrame, WX: Optional[pd.DataFrame]) -> pd.DataFrame:
 
 
 def mask(Q: np.ndarray, m: int = None) -> np.ndarray:
+    """Create mask at particular index
+
+    :param Q: Matrix for which mask is begin produces
+    :type Q: np.ndarray
+    :param m: Index at which to produce mask, defaults to None
+    :type m: int, optional
+    :return: Mask matrix
+    :rtype: np.ndarray
+    """
     if m is not None:
         z = np.zeros_like(Q)
         z[m] = 1
@@ -331,7 +340,22 @@ def mask(Q: np.ndarray, m: int = None) -> np.ndarray:
 
 def get_graph(
     graph: nx.Graph, vecs: np.ndarray, vals: np.ndarray, gft: np.ndarray, k: int = 0
-):
+) -> hv.Graph:
+    """Produces plot of particular GFT component over KK graph layout
+
+    :param graph: Paradise Papers Graph
+    :type graph: nx.Graph
+    :param vecs: Graph Fourier Transforms Eigenvectors
+    :type vecs: np.ndarray
+    :param vals:  Graph Fourier Tansform Eigenvalues
+    :type vals: np.ndarray
+    :param gft: Graph Fourier Transform Components
+    :type gft: np.ndarray
+    :param k: Chosen Graph Fourier Transform Components, defaults to 0
+    :type k: int, optional
+    :return: KK layout of particular GFT component
+    :rtype:  hv.Graph
+    """
     top_component: pd.Series = pd.Series((vecs @ (gft * mask(gft, k))).flatten())
     pos: Dict = nx.kamada_kawai_layout(graph)
 
@@ -356,7 +380,15 @@ def get_graph(
 def returns_weibull_gft(
     W: pd.DataFrame, y: pd.DataFrame
 ) -> Tuple[hv.element.chart.Scatter, hv.core.layout.Layout, hv.core.layout.Layout]:
+    """Computes representations of GFT components over graph for top components
 
+    :param W: Spatial weighting matrix
+    :type W: pd.DataFrame
+    :param y: Market returns
+    :type y: pd.DataFrame
+    :return: Plots of graph fourier components over graphs
+    :rtype: Tuple[hv.element.chart.Scatter, hv.core.layout.Layout, hv.core.layout.Layout]
+    """
     D: np.ndarray = np.diag(np.array(W.sum(0)).flatten(), 0)
     L: np.ndarray = D - W
 
@@ -404,6 +436,21 @@ def get_regression_diagnostics(
     title: str = "OLS",
     drop_features: Optional[List[str]] = None,
 ) -> hv.Graph:
+    """Outliter, PCA and clustering plots
+
+    :param X: Basis
+    :type X: pd.DataFrame
+    :param y: Market returns
+    :type y: pd.DataFrame
+    :param W: Spatial weighting matrix
+    :type W: pd.DataFrame
+    :param title: title given to particular plots, defaults to "OLS"
+    :type title: str, optional
+    :param drop_features: Features we look to drop from the dataframe, defaults to None
+    :type drop_features: Optional[List[str]], optional
+    :return: Outliter, PCA and clustering plots
+    :rtype: hv.Graph
+    """
     if drop_features is not None:
         X: pd.DataFrame = X.drop(columns=drop_features)
 
