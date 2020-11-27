@@ -21,6 +21,7 @@ ols: "Non-spatial"
 
 n_components: 200
 samples: 100
+runs: 1000
 
 drop_features:
     - price_to_earnings

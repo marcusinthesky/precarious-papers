@@ -687,3 +687,95 @@ def gft_simulation(
     )
 
     return true_plot, simulated
+
+
+def get_walk(graph: nx.Graph, membership: np.ndarray, walks: int = 1) -> pd.Series:
+    """Produces small pertubations in listed company signal along the graph
+
+    :param graph: Paradise papers graph
+    :type graph: nx.Graph
+    :param membership: membership signal
+    :type membership: np.ndarray
+    :param walks: number of possible steps to take along the graph, defaults to 1
+    :type walks: int, optional
+    :return: perturbed signal
+    :rtype: pd.Series
+    """
+    walk = pd.Series(membership.flatten(), index=list(graph.nodes))
+
+    for walks in range(walks):
+        for i, j in enumerate(walk.where(lambda df: df > 0).dropna().index):
+            thresh = 2 * (1 / (len(list(graph.neighbors(j)))))
+
+            for c in graph.neighbors(j):
+                if np.random.rand() > thresh:
+                    if walk[c] != 1:
+                        walk[c] = 1
+                        walk[j] = 0
+                        break
+    return walk
+
+
+def walks(
+    graph: nx.graph,
+    matched_entities: pd.DataFrame,
+    n_components: int = 400,
+    runs: int = 1000,
+) -> pd.DataFrame:
+    """We explore the impacts a short random walk of Matched Listed Company signals along our graph.
+    To perform this experiment we allow, with a probability of 0.5,
+    each Matched Listed Company signal to move to a neighbour.
+    Across 1000 runs, we compare graph frequency magnitudes between our
+    initial Matched Listed Company signal and our signal perturbed by these short random walks.
+    At each run we identify the frequency with the largest decreases in magnitude from our original signal.
+
+    :param graph: Paradise Papers graph
+    :type graph: nx.graph
+    :param matched_entities: Dataframe of node_ids of matched listed companies
+    :type matched_entities: pd.DataFrame
+    :param n_components: Number of GFT components to compute, defaults to 400
+    :type n_components: int, optional
+    param runs: Number of runs of short random walk
+    :type runs: int, optional
+    :return: Summary statistics on magnitude drop-offs
+    :rtype: pd.DataFrame
+    """
+    membership: np.ndarray = np.array(
+        [1 if f in matched_entities.node_id.tolist() else 0 for f in list(graph.nodes)]
+    ).reshape((-1, 1))
+
+    walk: pd.Series = get_walk(graph, matched_entities, 1)
+
+    W: csr_matrix = nx.to_scipy_sparse_matrix(graph)
+
+    D: np.ndarray = diags(np.array(W.sum(0)).flatten(), 0)
+    L: np.ndarray = D - W
+
+    del W
+    del D
+
+    vals, vecs = eigsh(L, k=n_components)
+
+    del L
+
+    U: np.ndarray = np.conjugate(vecs)  # noqa
+
+    gft: np.ndarray = np.tensordot(U, membership, ([0], [0]))
+
+    dm = []
+    f = []
+    for run in range(runs):
+        walk_gft: np.ndarray = np.tensordot(
+            U, get_walk(graph, matched_entities, 1).to_frame(), ([0], [0])
+        )
+        delta_mag = np.abs(gft) - np.abs(walk_gft)
+        pos = delta_mag.argmax()
+
+        dm.append(delta_mag.max())
+        f.append(vals[pos])
+
+    return (
+        pd.DataFrame({"(ΔMagnitude)+": dm, "Frequency": f})
+        .groupby("Frequency")
+        .agg(["mean", "count"])
+    )
