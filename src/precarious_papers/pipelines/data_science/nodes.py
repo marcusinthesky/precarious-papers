@@ -48,7 +48,6 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from statsmodels.graphics.regressionplots import influence_plot
 from statsmodels.regression.linear_model import OLS, OLSResults
-from statsmodels.stats.outliers_influence import variance_inflation_factor
 from statsmodels.tools.tools import add_constant
 
 hv.extension("bokeh")
@@ -632,7 +631,7 @@ def gft_simulation(
     L: csr_matrix = (D - A).astype("f")
 
     vals, vecs = eigsh(L, k=n_components)
-    U, e = np.conjugate(vecs), vals
+    U = np.conjugate(vecs)
 
     membership = np.array(
         [
@@ -727,7 +726,8 @@ def walks(
     each Matched Listed Company signal to move to a neighbour.
     Across 1000 runs, we compare graph frequency magnitudes between our
     initial Matched Listed Company signal and our signal perturbed by these short random walks.
-    At each run we identify the frequency with the largest decreases in magnitude from our original signal.
+    At each run we identify the frequency with the largest decreases
+    in magnitude from our original signal.
 
     :param graph: Paradise Papers graph
     :type graph: nx.graph
@@ -743,8 +743,6 @@ def walks(
     membership: np.ndarray = np.array(
         [1 if f in matched_entities.node_id.tolist() else 0 for f in list(graph.nodes)]
     ).reshape((-1, 1))
-
-    walk: pd.Series = get_walk(graph, matched_entities, 1)
 
     W: csr_matrix = nx.to_scipy_sparse_matrix(graph)
 
@@ -766,7 +764,7 @@ def walks(
     f = []
     for run in range(runs):
         walk_gft: np.ndarray = np.tensordot(
-            U, get_walk(graph, matched_entities, 1).to_frame(), ([0], [0])
+            U, get_walk(graph, membership, 1).to_frame(), ([0], [0])
         )
         delta_mag = np.abs(gft) - np.abs(walk_gft)
         pos = delta_mag.argmax()

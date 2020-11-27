@@ -68,7 +68,7 @@ def create_pipeline(**kwargs):
                     "params:n_components",
                     "params:runs",
                 ],
-                ["walks"],
+                "walks",
                 tags=["local", "walk"],
             ),
             node(
