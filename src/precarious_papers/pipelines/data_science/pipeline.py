@@ -68,7 +68,7 @@ def create_pipeline(**kwargs):
                     "params:n_components",
                     "params:runs",
                 ],
-                ["walks"],
+                "walks",
                 tags=["local", "walk"],
             ),
             node(
@@ -128,10 +128,7 @@ def create_pipeline(**kwargs):
                 tags=["pearson", "local"],
             ),
             node(
-                pearson_corr,
-                ["WX", "WX"],
-                "spatialpearson",
-                tags=["pearson", "local"],
+                pearson_corr, ["WX", "WX"], "spatialpearson", tags=["pearson", "local"],
             ),
             node(
                 biplots,

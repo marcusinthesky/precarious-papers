@@ -497,10 +497,7 @@ def get_regression_diagnostics(
         W ** 0.125
     )  # this is only to scale the layout
 
-    ols: OLSResults = OLS(
-        y,
-        X.assign(alpha=1),
-    ).fit()
+    ols: OLSResults = OLS(y, X.assign(alpha=1),).fit()
 
     fig, ax = plt.subplots(figsize=(20, 10))
     leverage: plt.Figure = influence_plot(ols, ax=ax)
@@ -562,10 +559,7 @@ def get_regression_diagnostics(
         height=500,
         title=f"Principal Components of our {title} Model with Cooks Outliers",
     ) * U_cooks.loc[top_cooks.index, :].reset_index().hvplot.labels(
-        x="Component 1",
-        y="Component 2",
-        text="symbol",
-        text_baseline="bottom",
+        x="Component 1", y="Component 2", text="symbol", text_baseline="bottom",
     )
 
     cluster_pca: Pipeline = Pipeline(
@@ -744,8 +738,6 @@ def walks(
         [1 if f in matched_entities.node_id.tolist() else 0 for f in list(graph.nodes)]
     ).reshape((-1, 1))
 
-    walk: pd.Series = get_walk(graph, matched_entities, 1)
-
     W: csr_matrix = nx.to_scipy_sparse_matrix(graph)
 
     D: np.ndarray = diags(np.array(W.sum(0)).flatten(), 0)
@@ -766,7 +758,7 @@ def walks(
     f = []
     for run in range(runs):
         walk_gft: np.ndarray = np.tensordot(
-            U, get_walk(graph, matched_entities, 1).to_frame(), ([0], [0])
+            U, get_walk(graph, membership, 1).to_frame(), ([0], [0])
         )
         delta_mag = np.abs(gft) - np.abs(walk_gft)
         pos = delta_mag.argmax()
