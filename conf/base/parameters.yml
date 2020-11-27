@@ -19,9 +19,9 @@ window:
 slx: "SLX"
 ols: "Non-spatial"
 
-n_components: 50
+n_components: 500
 samples: 100
-runs: 10
+runs: 1000
 
 drop_features:
     - price_to_earnings

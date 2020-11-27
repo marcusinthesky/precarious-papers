@@ -128,7 +128,10 @@ def create_pipeline(**kwargs):
                 tags=["pearson", "local"],
             ),
             node(
-                pearson_corr, ["WX", "WX"], "spatialpearson", tags=["pearson", "local"],
+                pearson_corr,
+                ["WX", "WX"],
+                "spatialpearson",
+                tags=["pearson", "local"],
             ),
             node(
                 biplots,
