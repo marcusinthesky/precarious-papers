@@ -327,3 +327,8 @@ graph_fourier_simulation:
   filepath: data/08_reporting/graph_fourier_simulation.png
   save_args:
     dpi: 700
+
+walks:
+  type: pandas.CSVDataSet
+  filepath: data/08_reporting/walks.csv
+  versioned: True
